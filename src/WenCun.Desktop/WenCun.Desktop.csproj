@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <AssemblyName>WenCun</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../WenCun.Core/WenCun.Core.csproj" />
+    <ProjectReference Include="../WenCun.Capture/WenCun.Capture.csproj" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
+  </ItemGroup>
+</Project>

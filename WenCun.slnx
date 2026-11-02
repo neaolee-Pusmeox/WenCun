@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WenCun.Core/WenCun.Core.csproj" />
+    <Project Path="src/WenCun.Capture/WenCun.Capture.csproj" />
+    <Project Path="src/WenCun.Desktop/WenCun.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WenCun.Tests/WenCun.Tests.csproj" />
+  </Folder>
+</Solution>

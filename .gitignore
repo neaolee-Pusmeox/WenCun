@@ -1,0 +1,36 @@
+# 构建输出
+**/bin/
+**/obj/
+.vs/
+.idea/
+publish/
+TestResults/
+*.user
+*.suo
+
+# 本地工具链
+.tools/
+
+# 只读参考产品，不属于文存源码
+WxArticleSaver/
+wechatDownload/
+
+# 本地数据与凭据
+*.db
+*.db-*
+*.sqlite*
+*.pfx
+*.p12
+*.pem
+*.key
+**/WebView2/
+**/EBWebView/
+
+# 可执行产物
+*.exe
+*.dll
+*.pdb
+
+# 系统文件
+Thumbs.db
+.DS_Store

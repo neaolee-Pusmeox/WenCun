@@ -1,0 +1,468 @@
+<Window x:Class="WenCun.Desktop.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="文存" Width="1280" Height="820" MinWidth="1000" MinHeight="640"
+        WindowStartupLocation="CenterScreen" Background="{DynamicResource CanvasBrush}"
+        FontFamily="Microsoft YaHei UI" FontSize="13" UseLayoutRounding="True">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="208"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Background="{DynamicResource SidebarBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
+            <Grid Margin="16,24,16,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <StackPanel Orientation="Horizontal" Margin="8,0,0,28">
+                    <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource AccentBrush}">
+                        <TextBlock Text="文" Foreground="White" FontSize="18" FontWeight="Bold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="文存" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock Text="公众号文章存档" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Grid.Row="1">
+                    <RadioButton Style="{StaticResource NavButton}" GroupName="Nav" Content="资料库"
+                                 IsChecked="{Binding Section, Converter={StaticResource Section}, ConverterParameter=Library, Mode=TwoWay}"/>
+                    <RadioButton Style="{StaticResource NavButton}" GroupName="Nav" Content="采集"
+                                 IsChecked="{Binding Section, Converter={StaticResource Section}, ConverterParameter=Collect, Mode=TwoWay}"/>
+                    <RadioButton Style="{StaticResource NavButton}" GroupName="Nav" Content="公众号"
+                                 IsChecked="{Binding Section, Converter={StaticResource Section}, ConverterParameter=Accounts, Mode=TwoWay}"/>
+                </StackPanel>
+                <StackPanel Grid.Row="3">
+                    <TextBlock Text="{Binding BuildText}" Style="{StaticResource Muted}" FontSize="10" Margin="8,0,8,8"/>
+                    <TextBlock Text="{Binding Status}" Foreground="{DynamicResource MutedBrush}" FontSize="11"
+                               TextWrapping="Wrap" Margin="8,0,8,10"/>
+                    <Button Content="打开文库文件夹" Command="{Binding OpenFolderCommand}" Style="{StaticResource GhostButton}"
+                            HorizontalAlignment="Left" Padding="8,6"/>
+                    <Button Content="切换明暗主题" Command="{Binding ToggleThemeCommand}" Style="{StaticResource GhostButton}"
+                            HorizontalAlignment="Left" Padding="8,6"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Column="1" Margin="28,24,28,20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <DockPanel>
+                <TextBlock Text="{Binding SectionTitle}" Style="{StaticResource H1}" DockPanel.Dock="Left"/>
+                <TextBlock Text="{Binding SectionSubtitle}" Style="{StaticResource Muted}" VerticalAlignment="Bottom" Margin="12,0,0,4"/>
+            </DockPanel>
+
+            <Grid Grid.Row="1" Margin="0,20,0,0">
+                <Grid Visibility="{Binding IsLibrarySection, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel>
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Right"
+                                    Visibility="{Binding LibraryPage.IsPendingView, Converter={StaticResource InverseBoolToVisibility}}">
+                            <Button Content="刷新" Command="{Binding LibraryPage.RefreshCommand}" Style="{StaticResource GhostButton}"/>
+                            <Button Content="重试失败" Command="{Binding LibraryPage.RetryFailedCommand}" Style="{StaticResource GhostButton}" Margin="4,0,0,0"/>
+                            <Button Content="重新导出" Command="{Binding LibraryPage.ReexportSelectedCommand}" Style="{StaticResource GhostButton}" Margin="4,0,0,0"/>
+                            <Button Content="删除" Command="{Binding LibraryPage.DeleteCommand}" Style="{StaticResource GhostButton}" Margin="4,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Right"
+                                    Visibility="{Binding LibraryPage.IsPendingView, Converter={StaticResource BoolToVisibility}}">
+                            <Button Content="刷新" Command="{Binding LibraryPage.RefreshCommand}" Style="{StaticResource GhostButton}"/>
+                            <Button Content="保存选中" Command="{Binding LibraryPage.SaveSelectedPendingCommand}" Style="{StaticResource PrimaryButton}" Margin="4,0,0,0"/>
+                            <Button Content="清理旧待采集" Command="{Binding LibraryPage.CleanupLegacyCommand}" Style="{StaticResource GhostButton}" Margin="4,0,0,0"/>
+                            <Button Content="删除" Command="{Binding LibraryPage.DeleteCommand}" Style="{StaticResource GhostButton}" Margin="4,0,0,0"/>
+                        </StackPanel>
+                        <Grid Width="300" HorizontalAlignment="Left">
+                            <TextBox Text="{Binding LibraryPage.Search, UpdateSourceTrigger=PropertyChanged}" Padding="10,7,58,7">
+                                <TextBox.InputBindings>
+                                    <KeyBinding Key="Enter" Command="{Binding LibraryPage.SearchCommand}"/>
+                                </TextBox.InputBindings>
+                            </TextBox>
+                            <TextBlock Text="搜索标题、公众号、作者" Foreground="{DynamicResource MutedBrush}" Margin="12,0,0,0"
+                                       VerticalAlignment="Center" IsHitTestVisible="False">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding LibraryPage.Search}" Value="">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <Button Content="搜索" Command="{Binding LibraryPage.SearchCommand}" HorizontalAlignment="Right"
+                                    Margin="0,2,2,2" Padding="10,4" Style="{StaticResource GhostButton}"/>
+                        </Grid>
+                    </DockPanel>
+
+                    <DockPanel Grid.Row="1" Margin="0,12,0,0">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                            <RadioButton Content="全部" Style="{StaticResource ChipButton}" GroupName="State"
+                                         IsChecked="{Binding LibraryPage.ShowAll, Mode=TwoWay}"/>
+                            <RadioButton Content="待采集" Style="{StaticResource ChipButton}" GroupName="State"
+                                         IsChecked="{Binding LibraryPage.ShowPending, Mode=TwoWay}"/>
+                            <RadioButton Content="已保存" Style="{StaticResource ChipButton}" GroupName="State"
+                                         IsChecked="{Binding LibraryPage.ShowReady, Mode=TwoWay}"/>
+                            <RadioButton Content="失败" Style="{StaticResource ChipButton}" GroupName="State"
+                                         IsChecked="{Binding LibraryPage.ShowFailed, Mode=TwoWay}"/>
+                        </StackPanel>
+                        <Button Content="{Binding LibraryPage.SortText}" Command="{Binding LibraryPage.ToggleSortCommand}"
+                                Style="{StaticResource GhostButton}" HorizontalAlignment="Right"/>
+                    </DockPanel>
+
+                    <Grid Grid.Row="2" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource Card}" Padding="0">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <RadioButton Content="{Binding LibraryPage.AllAccountsText}" GroupName="Accounts"
+                                             Style="{StaticResource NavButton}" Margin="8,8,8,0"
+                                             IsChecked="{Binding LibraryPage.IsAllAccounts, Mode=OneWay}"
+                                             Command="{Binding LibraryPage.SelectAllCommand}"/>
+                                <ListBox Grid.Row="1" ItemsSource="{Binding LibraryPage.Accounts}"
+                                         SelectedItem="{Binding LibraryPage.SelectedAccount, Mode=TwoWay}"
+                                         Margin="6,4,6,6" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Counts}" Style="{StaticResource Muted}" FontSize="11" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Column="1" Style="{StaticResource Card}" Padding="0" Margin="12,0,0,0">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <Border Background="{DynamicResource SubtleBrush}" CornerRadius="10,10,0,0" Padding="16,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="32"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox IsChecked="{Binding LibraryPage.AllSelected, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Text="文章" Style="{StaticResource Muted}" FontSize="11" Margin="6,0,0,0"/>
+                                        <TextBlock Grid.Column="2" Text="状态" Style="{StaticResource Muted}" FontSize="11" Margin="0,0,70,0"/>
+                                    </Grid>
+                                </Border>
+                                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsControl ItemsSource="{Binding LibraryPage.Items}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="16,10">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="32"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <CheckBox IsChecked="{Binding Selected, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                                        <StackPanel Grid.Column="1" Margin="6,0,12,0">
+                                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Text="{Binding Meta}" Style="{StaticResource Muted}" FontSize="11" Margin="0,3,0,0"/>
+                                                            <TextBlock Text="{Binding ErrorText}" Foreground="{DynamicResource DangerBrush}" FontSize="11"
+                                                                       TextWrapping="Wrap" Margin="0,3,0,0"
+                                                                       Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}"/>
+                                                            <TextBlock Text="{Binding ExportErrorText}" Foreground="{DynamicResource WarnBrush}" FontSize="11"
+                                                                       TextWrapping="Wrap" Margin="0,3,0,0"
+                                                                       Visibility="{Binding HasExportError, Converter={StaticResource BoolToVisibility}}"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding StateText}" Style="{StaticResource Muted}" FontSize="11"
+                                                                       Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="{Binding ExportText}" Style="{StaticResource Muted}" FontSize="11"
+                                                                       Margin="0,0,10,0" VerticalAlignment="Center"
+                                                                       Visibility="{Binding HasExport, Converter={StaticResource BoolToVisibility}}"/>
+                                                            <Button Content="阅读" Style="{StaticResource GhostButton}" Padding="10,4"
+                                                                    Command="{Binding DataContext.LibraryPage.ReadCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Visibility="{Binding IsNormal, Converter={StaticResource BoolToVisibility}}"/>
+                                                            <Button Content="重试" Style="{StaticResource GhostButton}" Padding="10,4"
+                                                                    Command="{Binding DataContext.LibraryPage.RetryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Visibility="{Binding IsFailed, Converter={StaticResource BoolToVisibility}}"/>
+                                                            <Button Content="文件夹" Style="{StaticResource GhostButton}" Padding="10,4"
+                                                                    Command="{Binding DataContext.LibraryPage.OpenFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Visibility="{Binding IsNormal, Converter={StaticResource BoolToVisibility}}"/>
+                                                            <Button Content="保存" Style="{StaticResource PrimaryButton}" Padding="10,4"
+                                                                    Command="{Binding DataContext.LibraryPage.SavePendingCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Visibility="{Binding IsPending, Converter={StaticResource BoolToVisibility}}"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                                <TextBlock Grid.Row="1" Text="{Binding LibraryPage.EmptyText}" Style="{StaticResource Muted}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Visibility="{Binding LibraryPage.IsEmpty, Converter={StaticResource BoolToVisibility}}"/>
+                            </Grid>
+                            </Border>
+                    </Grid>
+
+                    <DockPanel Grid.Row="3" Margin="0,12,0,0">
+                        <TextBlock Text="{Binding LibraryPage.Summary}" Style="{StaticResource Muted}" VerticalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                            <Button Content="上一页" Command="{Binding LibraryPage.PrevCommand}" Style="{StaticResource GhostButton}"/>
+                            <TextBlock Text="{Binding LibraryPage.PageText}" VerticalAlignment="Center" Margin="10,0" Style="{StaticResource Muted}"/>
+                            <Button Content="下一页" Command="{Binding LibraryPage.NextCommand}" Style="{StaticResource GhostButton}"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Grid>
+
+                <ScrollViewer Visibility="{Binding IsCollectSection, Converter={StaticResource BoolToVisibility}}" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="嗅探目录" Style="{StaticResource H2}"/>
+                                <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,14" LineHeight="22"
+                                           Text="点击开始嗅探后，在已登录的微信中打开目标公众号的一篇尚未缓存的文章。程序只读取目录，不保存正文；探明后在下方的待采集文章里选择要保存的内容。"/>
+                                <CheckBox Content="我同意首次安装一次本地根证书并修改当前用户代理（Windows 会弹一次安全警告；之后采集不再弹窗，可在下方移除证书）"
+                                          IsChecked="{Binding CollectPage.Consent, Mode=TwoWay}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                    <Button Content="开始嗅探" Command="{Binding CollectPage.StartCommand}" Style="{StaticResource PrimaryButton}"/>
+                                    <Button Content="停止" Command="{Binding CollectPage.StopCommand}" Style="{StaticResource GhostButton}" Margin="8,0,0,0"
+                                            IsEnabled="{Binding CollectPage.IsBusy}"/>
+                                </StackPanel>
+                                <TextBlock Text="{Binding CollectPage.State}" Margin="0,16,0,0" TextWrapping="Wrap" FontWeight="SemiBold"/>
+                                <ProgressBar IsIndeterminate="{Binding CollectPage.IsBusy}" Margin="0,10,0,0"
+                                             Visibility="{Binding CollectPage.IsBusy, Converter={StaticResource BoolToVisibility}}"/>
+                                <TextBlock Text="{Binding CollectPage.Detail}" Style="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding CollectPage.Counts}" Style="{StaticResource Muted}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                            <StackPanel>
+                                <DockPanel>
+                                    <WrapPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                        <Button Content="打开清单文件夹" Command="{Binding PendingPage.OpenFolderCommand}" Style="{StaticResource GhostButton}"/>
+                                        <Button Content="保存选中" Command="{Binding PendingPage.SaveCommand}" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"/>
+                                        <Button Content="删除选中" Command="{Binding PendingPage.DeleteCommand}" Style="{StaticResource GhostButton}" Margin="8,0,0,0"/>
+                                        <Button Content="清空" Command="{Binding PendingPage.ClearCommand}" Style="{StaticResource GhostButton}" Margin="8,0,0,0"/>
+                                        <Button Content="删除公众号" Command="{Binding PendingPage.DeleteAccountCommand}" Style="{StaticResource GhostButton}" Margin="8,0,0,0"/>
+                                    </WrapPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="待采集文章" Style="{StaticResource H2}"/>
+                                        <TextBlock Text="{Binding PendingPage.Summary}" Style="{StaticResource Muted}" FontSize="11" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </DockPanel>
+                                <TextBlock Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0">
+                                    <Run Text="清单保存在 "/><Run Text="{Binding PendingPage.Folder, Mode=OneWay}"/><Run Text="；只存公众号源和文章标题，和已保存的文章分开，切换文库不会丢失。"/>
+                                </TextBlock>
+                                <Grid Height="380" Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="200"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="0">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+                                            <RadioButton Content="全部待采集" GroupName="PendingAccounts" Style="{StaticResource NavButton}"
+                                                         Margin="8,8,8,0"
+                                                         IsChecked="{Binding PendingPage.IsAllAccounts, Mode=OneWay}"
+                                                         Command="{Binding PendingPage.SelectAllCommand}"/>
+                                            <ListBox Grid.Row="1" ItemsSource="{Binding PendingPage.Accounts}"
+                                                     SelectedItem="{Binding PendingPage.SelectedAccount, Mode=TwoWay}"
+                                                     Margin="6,4,6,6" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Text="{Binding Counts}" Style="{StaticResource Muted}" FontSize="11" Margin="0,2,0,0"/>
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
+                                            </ListBox>
+                                        </Grid>
+                                    </Border>
+                                    <Border Grid.Column="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                            CornerRadius="8" Padding="0" Margin="12,0,0,0">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+                                            <DockPanel Margin="12,8">
+                                                <CheckBox Content="全选" IsChecked="{Binding PendingPage.AllSelected, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                                <TextBlock Text="勾选后点上方「保存选中」" Style="{StaticResource Muted}" FontSize="11"
+                                                           HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                            </DockPanel>
+                                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                                <ItemsControl ItemsSource="{Binding PendingPage.Items}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="12,8">
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="28"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <CheckBox IsChecked="{Binding Selected, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                                                    <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                                        <TextBlock Text="{Binding Meta}" Style="{StaticResource Muted}" FontSize="11" Margin="0,2,0,0"/>
+                                                                        <TextBlock Text="{Binding Url}" Style="{StaticResource Muted}" FontSize="11" Margin="0,2,0,0"
+                                                                                   TextTrimming="CharacterEllipsis"/>
+                                                                        <TextBlock Text="{Binding Error}" Foreground="{DynamicResource DangerBrush}" FontSize="11"
+                                                                                   TextWrapping="Wrap" Margin="0,2,0,0"
+                                                                                   Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}"/>
+                                                                    </StackPanel>
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                            <TextBlock Grid.Row="1" Text="{Binding PendingPage.EmptyText}" Style="{StaticResource Muted}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Visibility="{Binding PendingPage.IsEmpty, Converter={StaticResource BoolToVisibility}}"/>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                            <StackPanel>
+                                <TextBlock Text="保存设置" Style="{StaticResource H2}"/>
+                                <TextBlock Text="保存选中文章时自动写入文库的 articles 目录；不选格式则只入库、不生成文件。"
+                                           Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,12"/>
+                                <TextBlock Text="文库位置" Style="{StaticResource Muted}" FontSize="11"/>
+                                <DockPanel Margin="0,6,0,0">
+                                    <Button Content="更换文库…" Command="{Binding CollectPage.ChangeLibraryCommand}" DockPanel.Dock="Right"
+                                            Style="{StaticResource BaseButton}" Margin="8,0,0,0"
+                                            IsEnabled="{Binding CollectPage.CanEditSettings}"/>
+                                    <TextBox Text="{Binding CollectPage.LibraryPath, Mode=OneWay}" IsReadOnly="True"/>
+                                </DockPanel>
+                                <TextBlock Text="选择空文件夹会复制当前文库；选择已有文库会打开它。旧文库不会被删除。"
+                                           Style="{StaticResource Muted}" FontSize="11" Margin="0,6,0,0"/>
+                                <TextBlock Text="保存格式" Style="{StaticResource Muted}" FontSize="11" Margin="0,14,0,0"/>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <CheckBox Content="HTML" IsChecked="{Binding CollectPage.SaveHtml, Mode=TwoWay}" Margin="0,0,20,8"/>
+                                    <CheckBox Content="Markdown" IsChecked="{Binding CollectPage.SaveMarkdown, Mode=TwoWay}" Margin="0,0,20,8"/>
+                                    <CheckBox Content="TXT" IsChecked="{Binding CollectPage.SaveText, Mode=TwoWay}" Margin="0,0,20,8"/>
+                                    <CheckBox Content="Word" IsChecked="{Binding CollectPage.SaveWord, Mode=TwoWay}" Margin="0,0,20,8"/>
+                                    <CheckBox Content="PDF" IsChecked="{Binding CollectPage.SavePdf, Mode=TwoWay}" Margin="0,0,20,8"/>
+                                </WrapPanel>
+                                <TextBlock Text="图片" Style="{StaticResource Muted}" FontSize="11" Margin="0,10,0,0"/>
+                                <StackPanel Margin="0,8,0,0">
+                                    <RadioButton Content="下载到本地（导出文件可离线查看）" GroupName="Images"
+                                                 IsChecked="{Binding CollectPage.ImagesDownload, Mode=TwoWay}" Margin="0,0,0,6"/>
+                                    <RadioButton Content="只保留远程链接（不下载图片）" GroupName="Images"
+                                                 IsChecked="{Binding CollectPage.ImagesLink, Mode=TwoWay}" Margin="0,0,0,6"/>
+                                    <RadioButton Content="不保存图片" GroupName="Images"
+                                                 IsChecked="{Binding CollectPage.ImagesNone, Mode=TwoWay}"/>
+                                </StackPanel>
+                                <DockPanel Margin="0,14,0,0">
+                                    <Button Content="移除本地证书" Command="{Binding CollectPage.RemoveCertificateCommand}"
+                                            DockPanel.Dock="Right" Style="{StaticResource GhostButton}"/>
+                                    <TextBlock Text="本地证书只需安装一次；移除后下次采集会重新安装。"
+                                               Style="{StaticResource Muted}" FontSize="11" VerticalAlignment="Center"/>
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <Grid Visibility="{Binding IsAccountsSection, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel>
+                        <Button Content="刷新" Command="{Binding AccountsPage.RefreshCommand}" Style="{StaticResource GhostButton}" DockPanel.Dock="Right"/>
+                        <TextBlock Text="{Binding AccountsPage.Summary}" Style="{StaticResource Muted}" VerticalAlignment="Center"/>
+                    </DockPanel>
+                    <TextBlock Grid.Row="1" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0" LineHeight="20"
+                               Text="每个公众号显示文章总数、采集失败、导出失败、待采集和上次采集时间。导出统计从本版本开始记录，旧版本导出的文件不计入。采集失败可在资料库或这里重试；导出失败会保留原因，重新导出即可。删除公众号会同时删除它的文章、图片、导出文件和待采集清单。"/>
+                    <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0" Margin="0,12,0,0">
+                        <Grid>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding AccountsPage.Items}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="16,12">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                                        <TextBlock Text="{Binding Stats}" Style="{StaticResource Muted}" FontSize="11" Margin="0,3,0,0"/>
+                                                        <TextBlock Style="{StaticResource Muted}" FontSize="11" Margin="0,3,0,0">
+                                                            <Run Text="{Binding LatestText, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding CollectedText, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding StatusText, Mode=OneWay}"/>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Button Content="查看文章" Style="{StaticResource GhostButton}"
+                                                                Command="{Binding DataContext.AccountsPage.ViewCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"/>
+                                                        <Button Content="查看待采集" Style="{StaticResource GhostButton}" Margin="8,0,0,0"
+                                                                Command="{Binding DataContext.AccountsPage.ViewPendingCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Visibility="{Binding HasPending, Converter={StaticResource BoolToVisibility}}"/>
+                                                        <Button Content="采集新文章" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"
+                                                                Command="{Binding DataContext.AccountsPage.CollectCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"/>
+                                                        <Button Content="重试失败" Style="{StaticResource GhostButton}" Margin="8,0,0,0"
+                                                                Command="{Binding DataContext.AccountsPage.RetryFailedCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Visibility="{Binding HasFailed, Converter={StaticResource BoolToVisibility}}"/>
+                                                        <Button Content="重新导出失败" Style="{StaticResource GhostButton}" Margin="8,0,0,0"
+                                                                Command="{Binding DataContext.AccountsPage.ReexportFailedCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Visibility="{Binding HasExportFailed, Converter={StaticResource BoolToVisibility}}"/>
+                                                        <Button Content="删除公众号" Style="{StaticResource GhostButton}" Margin="8,0,0,0"
+                                                                Foreground="{DynamicResource DangerBrush}"
+                                                                Command="{Binding DataContext.AccountsPage.DeleteCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                            <TextBlock Text="还没有跟踪的公众号。去「采集」页嗅探一次，这里就会显示每个公众号的进度。"
+                                       Style="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Visibility="{Binding AccountsPage.IsEmpty, Converter={StaticResource BoolToVisibility}}"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

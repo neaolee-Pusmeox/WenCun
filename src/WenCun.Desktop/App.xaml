@@ -1,0 +1,16 @@
+<Application x:Class="WenCun.Desktop.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:infra="clr-namespace:WenCun.Desktop.Infrastructure">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/Light.xaml"/>
+                <ResourceDictionary Source="Themes/Controls.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <infra:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
+            <infra:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
+            <infra:SectionConverter x:Key="Section"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
