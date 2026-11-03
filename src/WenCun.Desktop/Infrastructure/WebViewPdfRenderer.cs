@@ -13,6 +13,8 @@ public sealed class WebViewPdfRenderer(string appRoot) : IPdfRenderer
 
     public async Task RenderPdfAsync(string htmlPath, string pdfPath, CancellationToken ct)
     {
+        if (Application.Current is null)
+            throw new WenCunException(FailureKind.Renderer, "PDF 渲染需要桌面宿主。");
         await Application.Current.Dispatcher.InvokeAsync(async () =>
         {
             var environment = await WebViewHost.GetAsync(_appRoot);

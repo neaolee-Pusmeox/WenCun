@@ -2,6 +2,7 @@ using System.Reflection;
 using WenCun.Core.Domain;
 using WenCun.Core.Pending;
 using WenCun.Core.Storage;
+using WenCun.Desktop.Infrastructure;
 using WenCun.Desktop.ViewModels;
 
 namespace WenCun.Tests;
@@ -54,6 +55,29 @@ public sealed class DesktopRegressionTests : IDisposable
             Assert.False(Directory.Exists(Path.Combine(_root, "other")));
         }
         finally { gate.Release(); }
+    }
+
+    [Fact]
+    public void ConfigSaveIsAtomicAndMalformedFileFallsBack()
+    {
+        var root = Path.Combine(_root, "config");
+        var config = new AppConfig
+        {
+            LibraryPath = Path.Combine(_root, "library"),
+            Dark = true,
+            Formats = ["Html", "Pdf"],
+            Images = "Link"
+        };
+        config.Save(root);
+        var loaded = AppConfig.Load(root);
+        Assert.Equal(config.LibraryPath, loaded.LibraryPath);
+        Assert.True(loaded.Dark);
+        Assert.Equal("Html,Pdf", string.Join(",", loaded.Formats));
+        Assert.Equal("Link", loaded.Images);
+        Assert.Empty(Directory.GetFiles(root, "*.tmp"));
+
+        File.WriteAllText(Path.Combine(root, "config.json"), "{");
+        Assert.Equal("", AppConfig.Load(root).LibraryPath);
     }
 
     public void Dispose()

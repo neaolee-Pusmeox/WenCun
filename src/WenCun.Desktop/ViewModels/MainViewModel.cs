@@ -29,12 +29,16 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
         PdfRenderer = new WebViewPdfRenderer(appRoot);
         LibraryPage = new LibraryViewModel(library, Pending, this, SetStatus);
         PendingPage = new PendingViewModel(Pending, biz => _library.GetAccountName(biz),
-            selected => _ = SavePendingAsync(selected), DeletePendingAsync, ClearPendingAsync,
-            DeletePendingAccountAsync, SetStatus);
+            selected => _ = SavePendingAsync(selected), DeletePending, ClearPending,
+            DeletePendingAccount, SetStatus);
         CollectPage = new CollectViewModel(library, appRoot, PdfRenderer, Pending, OnDiscovered, () => PendingPage.Load(), () => _workGate.CurrentCount > 0);
         AccountsPage = new AccountsViewModel(library, Pending, ViewAccount, CollectAccount, RetryFailedAsync,
             ReexportFailedAsync, DeleteAccountAsync, ViewPending);
         CollectPage.ChangeLibraryRequested += () => ChangeLibraryRequested?.Invoke();
+        CollectPage.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(CollectViewModel.IsBusy)) OnPropertyChanged(nameof(IsBusy));
+        };
         OpenFolderCommand = new RelayCommand(() => OpenPath(_library.RootDirectory));
         ToggleThemeCommand = new RelayCommand(() => App.SetTheme(!App.Config.Dark));
         if (!string.IsNullOrWhiteSpace(recoveryWarning)) _status = recoveryWarning;
@@ -86,6 +90,7 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
         _ => "按公众号浏览已保存的文章"
     };
     public string Status { get => _status; private set => Set(ref _status, value); }
+    public string AppRoot => _appRoot;
     public string LibraryPath => _library.RootDirectory;
     public string BuildText => $"文存 {App.Version} · 构建 {App.BuildStamp}";
 
@@ -105,13 +110,14 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
             SetStatus("采集、保存或导出进行中，结束后再切换文库。");
             return;
         }
-        var full = Path.GetFullPath(path);
+        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
         if (string.Equals(full, _library.RootDirectory, StringComparison.OrdinalIgnoreCase)) return;
         if (File.Exists(Path.Combine(full, "library.db")))
         {
             var old = _library.RootDirectory;
             SwitchLibrary(full);
-            SetStatus($"已打开另一个文库；原文库保留在 {old}。");
+            if (string.Equals(_library.RootDirectory, full, StringComparison.OrdinalIgnoreCase))
+                SetStatus($"已打开另一个文库；原文库保留在 {old}。");
             return;
         }
         if (Directory.Exists(full) && Directory.EnumerateFileSystemEntries(full).Any())
@@ -120,14 +126,15 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
             return;
         }
         try { _library.CopyTo(full); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (IsExpected(ex))
         {
             SetStatus("移动文库失败：" + ex.Message);
             return;
         }
         var previous = _library.RootDirectory;
         SwitchLibrary(full);
-        SetStatus($"已复制文库到 {full}；旧文库保留在 {previous}，确认后可手动删除。");
+        if (string.Equals(_library.RootDirectory, full, StringComparison.OrdinalIgnoreCase))
+            SetStatus($"已复制文库到 {full}；旧文库保留在 {previous}，确认后可手动删除。");
     }
 
     public void SwitchLibrary(string path)
@@ -137,9 +144,14 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
             SetStatus("采集、保存或导出进行中，结束后再切换文库。");
             return;
         }
-        var full = Path.GetFullPath(path);
+        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
         if (string.Equals(full, _library.RootDirectory, StringComparison.OrdinalIgnoreCase)) return;
-        _library = new Library(full);
+        try { _library = new Library(full); }
+        catch (Exception ex)
+        {
+            SetStatus("打开文库失败：" + ex.Message);
+            return;
+        }
         App.Config.LibraryPath = _library.RootDirectory;
         App.Config.Save(_appRoot);
         LibraryPage.SetLibrary(_library);
@@ -173,34 +185,42 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
             SetStatus("重试需要先捕获一次会话：在采集页开始探明并打开一篇文章。");
             return;
         }
+        var eligible = articles.Where(article => article.Biz == session.Biz).ToArray();
+        if (eligible.Length == 0)
+        {
+            SetStatus("当前会话属于另一个公众号，无法重试这些文章。请重新捕获对应会话。");
+            return;
+        }
         if (!TryBeginWork()) return;
         try
         {
-            SetStatus($"正在重试 {articles.Count} 篇…");
+            SetStatus($"正在重试 {eligible.Length} 篇…");
             using var client = new WeChatClient();
             var collector = new Collector(_library, client, Pending, App.Config.ToSaveOptions(), PdfRenderer);
             var done = 0;
-            foreach (var article in articles)
+            foreach (var article in eligible)
             {
-                if (article.Biz != session.Biz) continue;
                 try
                 {
                     await collector.FetchBodyAsync(article, session, CancellationToken.None);
+                    try { Pending.RemoveArticles(article.Biz, [article.Id]); }
+                    catch (WenCunException) { /* Corrupt pending stays untouched; the saved article is still valid. */ }
                     done++;
                 }
-                catch (Exception ex) when (ex is WenCunException or IOException)
+                catch (Exception ex) when (IsExpected(ex))
                 {
                     _library.SetFailure(article.Id, ex.Message);
                 }
             }
-            SetStatus($"重试完成：成功 {done}，失败 {articles.Count - done}。");
+            var skipped = articles.Count - eligible.Length;
+            SetStatus(skipped == 0
+                ? $"重试完成：成功 {done}，失败 {eligible.Length - done}。"
+                : $"重试完成：成功 {done}，失败 {eligible.Length - done}，跳过 {skipped} 篇其他公众号。");
         }
-        finally { _workGate.Release(); }
+        finally { EndWork(); }
         LibraryPage.Load();
         AccountsPage.Load();
     }
-
-    public Task ReexportAsync(Article article) => ReexportAsync([article]);
 
     public async Task ReexportAsync(IReadOnlyList<Article> articles)
     {
@@ -228,11 +248,11 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
             }
             SetStatus($"重新导出完成：成功 {result.Succeeded}，失败 {result.Failed}。");
         }
-        catch (Exception ex) when (ex is WenCunException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (IsExpected(ex))
         {
             SetStatus("重新导出失败：" + ex.Message);
         }
-        finally { _workGate.Release(); }
+        finally { EndWork(); }
         LibraryPage.Load();
         AccountsPage.Load();
     }
@@ -242,9 +262,7 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
         var folder = ExportPaths.FolderFor(Path.Combine(_library.RootDirectory, "articles"), article);
         if (!Directory.Exists(folder))
         {
-            var oldArticleFolder = Path.Combine(_library.RootDirectory, "articles",
-                UrlRules.SafeFileName(article.Account.Length > 0 ? article.Account : "未命名公众号"),
-                (article.PublishedAt?.ToLocalTime().ToString("yyyy-MM-dd") ?? "日期未知") + " " + UrlRules.SafeFileName(article.Title));
+            var oldArticleFolder = ExportPaths.LegacyFolderFor(Path.Combine(_library.RootDirectory, "articles"), article);
             if (Directory.Exists(oldArticleFolder))
             {
                 OpenPath(oldArticleFolder);
@@ -281,68 +299,101 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
             SetStatus("保存需要先捕获一次会话：在采集页开始探明并打开一篇文章。");
             return;
         }
+        var eligible = selected.Where(article => string.Equals(article.Biz, session.Biz, StringComparison.Ordinal)).ToArray();
+        if (eligible.Length == 0)
+        {
+            Section = "Collect";
+            SetStatus("当前会话属于另一个公众号，无法保存这些待采集文章。请重新捕获对应会话。");
+            return;
+        }
         if (!TryBeginWork()) return;
         try
         {
-            SetStatus($"正在保存 {selected.Count} 篇…");
+            SetStatus($"正在保存 {eligible.Length} 篇…");
             using var client = new WeChatClient();
             var collector = new Collector(_library, client, Pending, App.Config.ToSaveOptions(), PdfRenderer);
             var saved = 0;
-            foreach (var group in selected.GroupBy(article => article.Biz))
-            {
-                if (!string.Equals(session.Biz, group.Key, StringComparison.Ordinal))
-                {
-                    SetStatus("当前会话属于另一个公众号，跳过 " + group.Key + " 的待采集文章。");
-                    continue;
-                }
+            foreach (var group in eligible.GroupBy(article => article.Biz))
                 saved += await collector.SaveSelectedAsync(session, group.Key, group.ToArray(), null, CancellationToken.None);
-            }
-            SetStatus($"已保存 {saved}/{selected.Count} 篇。");
+            var skipped = selected.Count - eligible.Length;
+            SetStatus(skipped == 0
+                ? $"已保存 {saved}/{eligible.Length} 篇。"
+                : $"已保存 {saved}/{eligible.Length} 篇，跳过 {skipped} 篇其他公众号。");
         }
-        catch (Exception ex) when (ex is WenCunException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (IsExpected(ex))
         {
             SetStatus("保存失败：" + ex.Message);
         }
-        finally { _workGate.Release(); }
+        finally { EndWork(); }
         PendingPage.Load();
         LibraryPage.Load();
         AccountsPage.Load();
     }
 
-    public void DeletePendingAsync(IReadOnlyList<PendingArticle> selected)
+    public void DeletePending(IReadOnlyList<PendingArticle> selected)
     {
         if (RejectBusy()) return;
-        foreach (var group in selected.GroupBy(article => article.Biz))
-            Pending.RemoveArticles(group.Key, group.Select(article => article.Id));
-        PendingPage.Load();
-        AccountsPage.Load();
+        try
+        {
+            foreach (var group in selected.GroupBy(article => article.Biz))
+                Pending.RemoveArticles(group.Key, group.Select(article => article.Id));
+            LibraryPage.Load();
+            PendingPage.Load();
+            AccountsPage.Load();
+        }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            SetStatus("删除待采集记录失败：" + ex.Message);
+        }
     }
 
-    private void ClearPendingAsync(string biz)
+    private void ClearPending(string biz)
     {
         if (RejectBusy()) return;
-        Pending.Clear(biz);
-        PendingPage.Load();
-        AccountsPage.Load();
+        try
+        {
+            Pending.Clear(biz);
+            LibraryPage.Load();
+            PendingPage.Load();
+            AccountsPage.Load();
+        }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            SetStatus("清空待采集记录失败：" + ex.Message);
+        }
     }
 
-    private void DeletePendingAccountAsync(string biz)
+    private void DeletePendingAccount(string biz)
     {
         if (RejectBusy()) return;
-        Pending.RemoveAccount(biz);
-        PendingPage.Load();
-        AccountsPage.Load();
+        try
+        {
+            Pending.RemoveAccount(biz);
+            LibraryPage.Load();
+            PendingPage.Load();
+            AccountsPage.Load();
+        }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            SetStatus("删除待采集清单失败：" + ex.Message);
+        }
     }
 
-    public Task CleanupLegacyPendingAsync()
+    public void CleanupLegacyPending()
     {
-        if (RejectBusy()) return Task.CompletedTask;
-        var count = _library.DeleteLegacyPending();
-        SetStatus(count == 0 ? "没有旧的待采集记录。" : $"已清理 {count} 条旧的待采集记录。");
-        LibraryPage.Load();
-        AccountsPage.Load();
-        PendingPage.Load();
-        return Task.CompletedTask;
+        if (RejectBusy()) return;
+        try
+        {
+            var count = _library.DeleteLegacyPending();
+            SetStatus(count == 0 ? "没有旧的待采集记录。" : $"已清理 {count} 条旧的待采集记录。");
+            LibraryPage.Load();
+            AccountsPage.Load();
+            PendingPage.Load();
+        }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            SetStatus("清理旧待采集记录失败：" + ex.Message);
+        }
     }
 
     private Task DeleteAccountAsync(Account account)
@@ -352,12 +403,19 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
             $"删除公众号「{account.Name}」？\n会删除 {account.Count} 篇文章、正文、图片和导出文件，以及它的待采集清单。",
             "文存", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
         if (answer != MessageBoxResult.OK) return Task.CompletedTask;
-        var (articles, _, _) = _library.DeleteAccountData(account.Biz);
-        Pending.RemoveAccount(account.Biz);
-        SetStatus($"已删除公众号「{account.Name}」：{articles} 篇文章。");
-        LibraryPage.Load();
-        AccountsPage.Load();
-        PendingPage.Load();
+        try
+        {
+            var (articles, _, _) = _library.DeleteAccountData(account.Biz);
+            Pending.RemoveAccount(account.Biz);
+            SetStatus($"已删除公众号「{account.Name}」：{articles} 篇文章。");
+            LibraryPage.Load();
+            AccountsPage.Load();
+            PendingPage.Load();
+        }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            SetStatus("删除公众号失败：" + ex.Message);
+        }
         return Task.CompletedTask;
     }
 
@@ -415,5 +473,20 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
         return true;
     }
 
-    private bool TryBeginWork() => !RejectBusy() && _workGate.Wait(0);
+    private static bool IsExpected(Exception ex) =>
+        ex is WenCunException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException;
+
+    private bool TryBeginWork()
+    {
+        if (RejectBusy()) return false;
+        _workGate.Wait(0);
+        OnPropertyChanged(nameof(IsBusy));
+        return true;
+    }
+
+    private void EndWork()
+    {
+        _workGate.Release();
+        OnPropertyChanged(nameof(IsBusy));
+    }
 }

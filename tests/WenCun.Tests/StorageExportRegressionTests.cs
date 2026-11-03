@@ -71,14 +71,12 @@ public sealed class StorageExportRegressionTests : IDisposable
     public void CopyUsesDatabaseSnapshotWithoutCopyingLiveWalFiles()
     {
         var article = Save();
-        _library.SetSetting("saved", "value");
         var target = Path.Combine(_root, "copy");
         Assert.True(File.Exists(_library.DatabasePath + "-wal"));
         _library.CopyTo(target);
         Assert.False(File.Exists(Path.Combine(target, "library.db-wal")));
         Assert.False(File.Exists(Path.Combine(target, "library.db-shm")));
         var copy = new Library(target);
-        Assert.Equal("value", copy.GetSetting("saved"));
         Assert.Equal(_library.GetContent(article.Id)!.BodyHtml, copy.GetContent(article.Id)!.BodyHtml);
     }
 

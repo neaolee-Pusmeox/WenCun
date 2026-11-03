@@ -21,10 +21,12 @@ public sealed class Exporter(Library library, IPdfRenderer? renderer = null)
         FileBoundary.RequireNoLinks(root);
         Directory.CreateDirectory(root);
         var formats = request.Formats.Distinct().ToArray();
+        var targets = request.Articles.DistinctBy(article => article.Id).ToArray();
         var done = 0;
-        foreach (var requested in request.Articles.DistinctBy(article => article.Id))
+        foreach (var requested in targets)
         {
             ct.ThrowIfCancellationRequested();
+            progress?.Report($"正在导出 {++done}/{targets.Length}：{requested.Title}");
             var article = library.GetArticle(requested.Id) ?? requested;
             var content = library.GetContent(article.Id);
             if (content is null)
@@ -33,7 +35,6 @@ public sealed class Exporter(Library library, IPdfRenderer? renderer = null)
                     items.Add(new ExportItem(article.Id, article.Title, format, false, null, "正文尚未保存，无法导出。"));
                 continue;
             }
-            progress?.Report($"正在导出 {++done}/{request.Articles.Count}：{article.Title}");
             try
             {
                 var folder = FileBoundary.RequireWithin(root, ExportPaths.FolderFor(root, article));

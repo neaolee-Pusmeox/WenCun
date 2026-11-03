@@ -5,9 +5,17 @@
     <UseWPF>true</UseWPF>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <AssemblyName>WenCun</AssemblyName>
+    <ApplicationIcon>Assets\wencun.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
   </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\wencun.ico" />
+    <Resource Include="Assets\Fonts\*.ttf" />
+    <Content Include="Assets\Fonts\LICENSE-HarmonyOS-Sans.txt"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../WenCun.Core/WenCun.Core.csproj" />
     <ProjectReference Include="../WenCun.Capture/WenCun.Capture.csproj" />

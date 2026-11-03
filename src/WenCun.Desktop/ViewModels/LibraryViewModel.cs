@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using WenCun.Core.Domain;
@@ -46,7 +47,6 @@ public sealed class LibraryViewModel : ObservableObject
         SelectAllCommand = new RelayCommand(() => SelectedAccount = null);
         ReadCommand = new RelayCommand<ArticleRow>(row => _actions.Read(row.Article));
         RetryCommand = new RelayCommand<ArticleRow>(row => _ = _actions.RetryAsync(row.Article));
-        ReexportCommand = new RelayCommand<ArticleRow>(row => _ = _actions.ReexportAsync(row.Article));
         OpenFolderCommand = new RelayCommand<ArticleRow>(row => _actions.OpenFolder(row.Article));
         SavePendingCommand = new RelayCommand<ArticleRow>(row =>
         {
@@ -58,7 +58,7 @@ public sealed class LibraryViewModel : ObservableObject
             if (pending.Length == 0) { _status("请先勾选要保存的待采集文章。"); return; }
             _ = _actions.SavePendingAsync(pending);
         });
-        CleanupLegacyCommand = new RelayCommand(() => _ = _actions.CleanupLegacyPendingAsync());
+        CleanupLegacyCommand = new RelayCommand(_actions.CleanupLegacyPending);
         RetryFailedCommand = new RelayCommand(() =>
         {
             if (_isPendingView) { _status("待采集文章还没有正文，先保存。"); return; }
@@ -150,7 +150,6 @@ public sealed class LibraryViewModel : ObservableObject
     public ICommand SelectAllCommand { get; }
     public ICommand ReadCommand { get; }
     public ICommand RetryCommand { get; }
-    public ICommand ReexportCommand { get; }
     public ICommand OpenFolderCommand { get; }
     public ICommand SavePendingCommand { get; }
     public ICommand SaveSelectedPendingCommand { get; }
@@ -174,18 +173,13 @@ public sealed class LibraryViewModel : ObservableObject
     public void SetLibrary(Library library)
     {
         _library = library;
-        _isPendingView = false;
         _selectedAccount = null;
-        _page = 1;
-        OnPropertyChanged(nameof(IsPendingView));
-        Load();
+        SetState(null);
     }
 
     public void SelectAccount(string biz)
     {
-        _isPendingView = false;
-        OnPropertyChanged(nameof(IsPendingView));
-        LoadAccounts();
+        SetState(null);
         SelectedAccount = Accounts.FirstOrDefault(row => row.Account.Biz == biz);
     }
 
@@ -327,15 +321,22 @@ public sealed class LibraryViewModel : ObservableObject
         {
             var pending = selected.Where(row => row.Pending is not null).Select(row => row.Pending!).ToArray();
             if (pending.Length == 0) return;
-            _actions.DeletePendingAsync(pending);
+            _actions.DeletePending(pending);
             Load();
             return;
         }
         var answer = MessageBox.Show($"从资料库删除 {selected.Length} 篇文章？\n只删除资料库记录，已导出的文件保留。",
             "文存", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
         if (answer != MessageBoxResult.OK) return;
-        _library.DeleteArticles(selected.Select(row => row.Article.Id));
-        _status($"已删除 {selected.Length} 篇文章。");
-        Load();
+        try
+        {
+            _library.DeleteArticles(selected.Select(row => row.Article.Id));
+            _status($"已删除 {selected.Length} 篇文章。");
+            Load();
+        }
+        catch (Exception ex) when (ex is WenCunException or IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            _status("删除文章失败：" + ex.Message);
+        }
     }
 }

@@ -13,7 +13,7 @@ public partial class App : Application
     public static string AppRoot { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WenCun");
 
-    public static string Version => typeof(App).Assembly.GetName().Version?.ToString(3) ?? "0.1.0";
+    public static string Version => typeof(App).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
 
     public static string BuildStamp
     {
@@ -62,5 +62,10 @@ public partial class App : Application
         });
         Config.Dark = dark;
         Config.Save(AppRoot);
+        foreach (var window in Current.Windows.OfType<Window>())
+        {
+            WindowTheme.ApplyDarkTitleBar(window, dark);
+            WindowTheme.ApplyTextRendering(window, dark);
+        }
     }
 }

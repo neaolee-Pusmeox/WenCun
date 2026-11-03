@@ -42,7 +42,18 @@ public sealed class AppConfig
     {
         try
         {
-            File.WriteAllText(PathFor(root), JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+            var path = PathFor(root);
+            var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                Directory.CreateDirectory(root);
+                File.WriteAllText(temporary, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+                File.Move(temporary, path, true);
+            }
+            finally
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

@@ -1,5 +1,6 @@
 using System.Windows;
 using Microsoft.Win32;
+using WenCun.Desktop.Infrastructure;
 using WenCun.Desktop.ViewModels;
 
 namespace WenCun.Desktop.Views;
@@ -15,6 +16,11 @@ public partial class MainWindow : Window
         Width = Math.Min(Width, area.Width);
         Height = Math.Min(Height, area.Height);
         DataContext = model;
+        SourceInitialized += (_, _) =>
+        {
+            WindowTheme.ApplyDarkTitleBar(this, App.Config.Dark);
+            WindowTheme.ApplyTextRendering(this, App.Config.Dark);
+        };
         var closing = false;
         Closing += async (_, e) =>
         {
@@ -33,7 +39,7 @@ public partial class MainWindow : Window
             }
         };
         model.ReadRequested += (article, content) =>
-            new ReaderWindow(article, content, model.Library) { Owner = this }.Show();
+            new ReaderWindow(article, content, model.Library, model.AppRoot) { Owner = this }.Show();
         model.ChangeLibraryRequested += () =>
         {
             var dialog = new OpenFolderDialog { Title = "选择文库文件夹", InitialDirectory = model.LibraryPath };

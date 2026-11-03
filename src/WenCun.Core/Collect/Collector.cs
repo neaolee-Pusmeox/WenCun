@@ -165,9 +165,19 @@ public sealed class Collector(Library library, WeChatClient client, PendingStore
             try
             {
                 var bytes = await client.DownloadAsync(asset.Source, ct).ConfigureAwait(false);
+                var path = FileBoundary.RequireWithin(library.AssetsDirectory,
+                    Path.Combine(directory, Hash(asset.Source)[..16] + Extension(asset.Source, bytes)));
                 Directory.CreateDirectory(directory);
-                var path = Path.Combine(directory, Hash(asset.Source)[..16] + Extension(asset.Source, bytes));
-                await File.WriteAllBytesAsync(path, bytes, ct).ConfigureAwait(false);
+                var temporary = FileBoundary.TemporarySibling(path);
+                try
+                {
+                    await File.WriteAllBytesAsync(temporary, bytes, ct).ConfigureAwait(false);
+                    FileBoundary.Publish(temporary, path);
+                }
+                finally
+                {
+                    if (File.Exists(temporary)) File.Delete(temporary);
+                }
                 result.Add(asset with { LocalPath = Path.GetRelativePath(library.RootDirectory, path) });
             }
             catch (Exception ex) when (ex is WenCunException or IOException or UnauthorizedAccessException)

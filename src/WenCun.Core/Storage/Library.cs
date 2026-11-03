@@ -18,6 +18,7 @@ public sealed class Library
             title TEXT NOT NULL,
             author TEXT NOT NULL,
             url TEXT NOT NULL,
+            article_index INTEGER NOT NULL DEFAULT 1,
             published TEXT,
             state INTEGER NOT NULL,
             last_error TEXT,
@@ -40,7 +41,6 @@ public sealed class Library
             complete INTEGER NOT NULL DEFAULT 0,
             last_collected TEXT,
             updated TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
         """;
 
     private readonly string _connectionString;
@@ -284,20 +284,6 @@ public sealed class Library
         return new LibraryPage(items, total, page, pageSize);
     }
 
-    public IReadOnlyList<Article> PendingArticles(string biz, int limit = 500)
-    {
-        using var connection = Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = SelectArticles +
-            " WHERE biz=$biz AND state IN (0,3) ORDER BY published IS NULL, published DESC, id LIMIT $limit";
-        command.Parameters.AddWithValue("$biz", biz);
-        command.Parameters.AddWithValue("$limit", limit);
-        var items = new List<Article>();
-        using var reader = command.ExecuteReader();
-        while (reader.Read()) items.Add(ReadArticle(reader));
-        return items;
-    }
-
     public IReadOnlyList<Article> FailedArticles(string? biz = null, int limit = 500)
     {
         using var connection = Open();
@@ -475,15 +461,6 @@ public sealed class Library
         return ids.Count;
     }
 
-    public void DeleteAccount(string biz)
-    {
-        using var connection = Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM accounts WHERE biz=$biz AND NOT EXISTS (SELECT 1 FROM articles WHERE biz=$biz)";
-        command.Parameters.AddWithValue("$biz", biz);
-        command.ExecuteNonQuery();
-    }
-
     public (int Articles, int Assets, int Exports) DeleteAccountData(string biz)
     {
         using var connection = Open();
@@ -563,25 +540,6 @@ public sealed class Library
             Directory.Move(staging, full);
         }
         finally { FileBoundary.TryDeleteDirectory(Path.GetDirectoryName(staging)!, staging); }
-    }
-
-    public string? GetSetting(string key)
-    {
-        using var connection = Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = "SELECT value FROM settings WHERE key=$key";
-        command.Parameters.AddWithValue("$key", key);
-        return command.ExecuteScalar() as string;
-    }
-
-    public void SetSetting(string key, string value)
-    {
-        using var connection = Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = "INSERT INTO settings(key,value) VALUES($key,$value) ON CONFLICT(key) DO UPDATE SET value=excluded.value";
-        command.Parameters.AddWithValue("$key", key);
-        command.Parameters.AddWithValue("$value", value);
-        command.ExecuteNonQuery();
     }
 
     private const string SelectArticles =

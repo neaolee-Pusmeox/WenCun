@@ -106,7 +106,7 @@ public sealed class PendingViewModel : ObservableObject
         ? $"共 {Accounts.Sum(row => row.Account.Articles.Count)} 篇待采集"
         : $"{_selectedAccount.Name} · {_selectedAccount.Account.Articles.Count} 篇待采集";
     public bool IsEmpty => Items.Count == 0;
-    public string EmptyText => "还没有待采集文章。去「采集」页嗅探目录。";
+    public string EmptyText => "还没有待采集文章。开始嗅探后，目录会出现在这里。";
     public string Folder => _store.Directory;
 
     public ICommand RefreshCommand { get; }

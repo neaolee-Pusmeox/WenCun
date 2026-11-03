@@ -13,7 +13,7 @@ public static class ExportPaths
             (article.PublishedAt?.ToLocalTime().ToString("yyyy-MM-dd") ?? "日期未知") + " " + Component(article.Title) +
             " [" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(article.Id)))[..16] + "]");
 
-    internal static string LegacyFolderFor(string articlesRoot, Article article) =>
+    public static string LegacyFolderFor(string articlesRoot, Article article) =>
         Path.Combine(articlesRoot,
             UrlRules.SafeFileName(article.Account.Length > 0 ? article.Account : "未命名公众号"),
             (article.PublishedAt?.ToLocalTime().ToString("yyyy-MM-dd") ?? "日期未知") + " " + UrlRules.SafeFileName(article.Title));

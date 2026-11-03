@@ -1,6 +1,6 @@
 # 文存 WenCun
 
-当前预发布版本：`0.1.0`。
+当前预发布版本：`0.1.1`。
 
 文存是 Windows 上的微信公众号文章归档工具：从已登录的微信捕获阅读会话，嗅探公众号历史目录，勾选文章后保存到本地文库，并导出 HTML、Markdown、TXT、Word 或 PDF。
 
@@ -24,6 +24,10 @@
 | 资料库 | 按公众号浏览，搜索标题/公众号/作者，阅读、重试、重新导出；“待采集”筛选读取 JSON 清单 |
 | 采集 | 嗅探目录、选择待采集文章、选择文库与输出格式、设置图片保存方式 |
 | 公众号 | 汇总已保存文章及只嗅探尚未保存的公众号，查看目录进度，进入对应列表 |
+
+## 界面与标识
+
+界面采用“纸与墨的私人档案馆”作为视觉概念：暖纸底、墨色文字、松烟绿主操作与封泥红小标记，浅色和深色主题共用同一套语义色。界面正文使用随程序内置的 HarmonyOS Sans SC（Regular / Medium），不依赖系统是否安装字体；导出的 HTML 不内嵌字体，按系统字体栈回退。侧栏标记与应用图标以“文”字骨架为形，源文件在 `src/WenCun.Desktop/Assets/`。HarmonyOS Sans SC 依 HarmonyOS Sans Fonts License Agreement 随程序分发，许可原文位于 `src/WenCun.Desktop/Assets/Fonts/LICENSE-HarmonyOS-Sans.txt`。完整规范见 [界面设计规范](docs/UI-DESIGN.md)。
 
 任务期间不能切换文库、删除任务数据或启动另一个写入任务。关闭窗口会先停止嗅探并等待代理清理；保存或导出期间需等待任务结束。
 
@@ -78,6 +82,7 @@
 ```powershell
 dotnet build WenCun.slnx
 dotnet test tests\WenCun.Tests\WenCun.Tests.csproj --no-build
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\run.ps1
 ```
 
@@ -102,6 +107,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish.ps1 -Output 
 ## 开发文档
 
 - [开发指南](docs/DEVELOPMENT.md)：架构、数据契约、调试、验证与修改入口。
+- [界面设计规范](docs/UI-DESIGN.md)：色彩、字体、标识、组件与阅读页约定。
+- [发布规约](docs/RELEASE.md)：版本源、唯一验证门禁、提交与发版路径。
+- [更新记录](CHANGELOG.md)：每个发布版本的界面、功能和维护变化。
+- [第三方组件与字体](THIRD-PARTY-NOTICES.md)：HarmonyOS Sans SC 许可与使用声明。
 - [技术与功能对比](docs/PRODUCT-COMPARISON.md)：文存、WxArticleSaver、wechatDownload 的路径和可借鉴事项。
 - [维护约定](AGENTS.md)：开发时必须同步的跨模块约束。
 

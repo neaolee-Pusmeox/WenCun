@@ -77,8 +77,9 @@ public sealed class CollectViewModel : ObservableObject
     public bool CanEditSettings => !IsBusy;
     public string State { get => _state; private set => Set(ref _state, value); }
     public string Detail { get => _detail; private set => Set(ref _detail, value); }
-    public string Counts => $"目录 {_pages} 页 · 探明 {_found} 篇 · 待采集 {_pendingCount} 篇";
-    public bool HasSession => _session is not null;
+    public int PageCount => _pages;
+    public int FoundCount => _found;
+    public int PendingCount => _pendingCount;
     public Session? LastSession => _session;
     public Task StopAsync()
     {
@@ -106,7 +107,6 @@ public sealed class CollectViewModel : ObservableObject
     {
         _library = library;
         _session = null;
-        OnPropertyChanged(nameof(HasSession));
         OnPropertyChanged(nameof(LastSession));
         OnPropertyChanged(nameof(LibraryPath));
     }
@@ -160,7 +160,7 @@ public sealed class CollectViewModel : ObservableObject
         IsBusy = true;
         _stopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _pages = _found = _pendingCount = 0;
-        OnPropertyChanged(nameof(Counts));
+        NotifyCounts();
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
         CaptureProxy? proxy = null;
@@ -180,7 +180,6 @@ public sealed class CollectViewModel : ObservableObject
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
             var session = await captured.Task.WaitAsync(linked.Token);
             _session = session;
-            OnPropertyChanged(nameof(HasSession));
             OnPropertyChanged(nameof(LastSession));
             State = "正在恢复网络…";
             Detail = "正在恢复代理…";
@@ -195,7 +194,7 @@ public sealed class CollectViewModel : ObservableObject
                 _pages = report.Pages;
                 _found = report.Found;
                 _pendingCount = report.Saved;
-                OnPropertyChanged(nameof(Counts));
+                NotifyCounts();
                 Detail = report.Stage + " · " + report.Detail;
                 _refreshPending();
             });
@@ -239,5 +238,12 @@ public sealed class CollectViewModel : ObservableObject
             _expectedAccount = "";
             _stopped.TrySetResult();
         }
+    }
+
+    private void NotifyCounts()
+    {
+        OnPropertyChanged(nameof(PageCount));
+        OnPropertyChanged(nameof(FoundCount));
+        OnPropertyChanged(nameof(PendingCount));
     }
 }

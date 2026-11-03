@@ -19,7 +19,7 @@
 
 Core 面向 net10.0，其他项目面向 net10.0-windows。Desktop 引用 Core 与 Capture，Capture 只引用 Core。PDF 通过 Core 的 IPdfRenderer 接口注入 Desktop 实现。
 
-准确依赖版本以 csproj 为准。Directory.Build.props 统一可空引用、C# 14、警告视为错误和产品版本；global.json 固定 SDK。主项目当前没有 CI 工作流和依赖锁文件，不能用“CI 已保证”代替实际验证。
+准确依赖版本以 csproj 为准。Directory.Build.props 统一可空引用、C# 14、警告视为错误和产品版本；global.json 固定 SDK。版本源、验证门禁和发版步骤见 [发布规约](RELEASE.md)，scripts/verify.ps1 会校验 README/CHANGELOG 与版本源一致。主项目当前没有 CI 工作流和依赖锁文件，不能用“CI 已保证”代替实际验证。
 
 ## 两段采集流程
 
@@ -106,7 +106,7 @@ MainViewModel 持有 Library、三个页面与保存/导出信号量。嗅探也
 
 PendingViewModel.Load 保留已选项，新文章默认不勾选。AccountsViewModel 合并 SQLite 和 pending。LibraryViewModel 的“待采集”分支同样读取 pending。
 
-配置持久化使用构造函数传入的 appRoot。测试必须使用临时目录，不能用静态 App.AppRoot 覆盖调用者隔离。
+配置持久化、ReaderWindow 预览目录和 WebView2 用户数据目录都使用构造函数传入的 appRoot。测试必须使用临时目录，不能用静态 App.AppRoot 覆盖调用者隔离。
 
 | 修改行为 | 入口 | 同步检查 |
 | --- | --- | --- |
@@ -117,15 +117,17 @@ PendingViewModel.Load 保留已选项，新文章默认不勾选。AccountsViewM
 | 导出资源与路径 | ExportPaths/Exporter/FileBoundary | 同名冲突、旧文件保护、删除归属、ReaderWindow |
 | 新格式 | Models/Exporter/AppConfig/CollectViewModel/XAML | 枚举值、选项、失败状态、README |
 | 数据库 | Library.Schema/Migrate | 旧库复制、默认值、查找统计、用户备份 |
+| 主题、控件、图标、字体 | Themes/Light.xaml、Dark.xaml、Controls.xaml、Assets/wencun.ico、Assets/Fonts | 三页浅/深色、1000 宽窗口、焦点与选中态、字体许可 |
+| 阅读页与导出样式 | MarkupWriter.Css/Html | HTML 导出、ReaderWindow、打印与窄屏 |
 
 ## 验证与发布
 
 ```powershell
-.\.tools\dotnet\dotnet.exe build WenCun.slnx
-.\.tools\dotnet\dotnet.exe test tests\WenCun.Tests\WenCun.Tests.csproj --no-build
-.\.tools\dotnet\dotnet.exe test tests\WenCun.Tests\WenCun.Tests.csproj --filter "FullyQualifiedName~CollectionRegressionTests|FullyQualifiedName~DesktopRegressionTests|FullyQualifiedName~NativeUiTests"
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish.ps1 -Output publish\review
 ```
+
+`verify.ps1` 依次校验版本镜像、构建和全部测试；`-SkipNativeUi` 只用于没有桌面会话的自动化环境。发布版本、标签和远程步骤按 [发布规约](RELEASE.md) 执行，不在这里另写一套顺序。
 
 NativeUiTests 需要 Windows 桌面，会短暂创建真实 MainWindow 并输出截图路径；使用普通 Application 测试宿主加载生产主题，不执行 App.OnStartup。它验证实际绑定与可见文字，不等于微信或 PDF 现场验收。
 
@@ -141,5 +143,6 @@ NativeUiTests 需要 Windows 桌面，会短暂创建真实 MainWindow 并输出
 - Partial 计入账号已保存统计，但“已保存”筛选只显示 Ready，Partial 需从“全部”查看。
 - 失败批量重试默认最多 500 条，无持久任务队列，重启需重新捕获会话。
 - 单实例保护、采集崩溃的即时代理恢复尚未实现；不要同时启动多个实例采集。
-- 阅读器临时目录的清理、资源完整性汇总、PDF 图片与字体等待和真实渲染验收仍待补齐。
+- 阅读器临时目录在窗口关闭后尽力清理，文件仍被 WebView2 占用时可能保留。
+- 资源完整性汇总、PDF 图片与字体等待和真实渲染验收仍待补齐。
 - 文件清理为尽力执行；共享旧目录、改名前目录、锁定文件可能保留，数据库和文件系统不在一个事务。

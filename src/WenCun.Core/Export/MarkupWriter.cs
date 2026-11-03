@@ -10,20 +10,47 @@ namespace WenCun.Core.Export;
 public static class MarkupWriter
 {
     private const string Css = """
-        :root{color-scheme:light}
-        body{font:17px/1.9 "Microsoft YaHei UI",system-ui,sans-serif;color:#1f2733;background:#fff;max-width:760px;margin:48px auto;padding:0 28px;overflow-wrap:anywhere}
-        h1{font-size:30px;line-height:1.45;margin:0 0 12px}
-        header{border-bottom:1px solid #e6e8ec;padding-bottom:22px;margin-bottom:28px}
-        .meta{color:#6b7686;font-size:14px}
-        a{color:#2f6feb}
-        img{max-width:100%!important;height:auto!important}
-        pre{white-space:pre-wrap;background:#f5f6f8;padding:16px;border-radius:8px}
-        blockquote{border-left:3px solid #b9c6e6;margin-left:0;padding-left:16px;color:#5b6675}
-        table{border-collapse:collapse;max-width:100%}
-        td,th{border:1px solid #dfe3ea;padding:8px}
-        aside{background:#fff7e2;padding:12px 14px;font-size:14px;margin-bottom:22px;border-radius:6px}
-        footer{margin-top:40px;font-size:12px;color:#8a94a3}
-        @media print{body{margin:0;max-width:none}a{color:inherit}pre,img,blockquote{break-inside:avoid}}
+        :root{color-scheme:light;--paper:#f1ece2;--sheet:#fbf8f1;--ink:#202723;--heading:#17201b;--muted:#6e7268;--faint:#8d9086;--rule:#ddd5c6;--accent:#2b5a4b;--seal:#b95037;--note:#f7eedf}
+        *{box-sizing:border-box}
+        html{background:var(--paper);scrollbar-color:#c9c2b4 var(--paper);scrollbar-width:thin}
+        ::-webkit-scrollbar{width:10px;height:10px}
+        ::-webkit-scrollbar-track{background:var(--paper)}
+        ::-webkit-scrollbar-thumb{background:#c9c2b4;border:3px solid var(--paper);border-radius:6px}
+        ::-webkit-scrollbar-thumb:hover{background:#a89f90}
+        body{margin:0;padding:40px 24px 56px;background:var(--paper);color:var(--ink);font:16.5px/1.92 "HarmonyOS Sans SC","Noto Sans SC","Microsoft YaHei UI",system-ui,sans-serif;overflow-wrap:anywhere}
+        .sheet{max-width:760px;margin:0 auto;background:var(--sheet);border:1px solid var(--rule);border-radius:10px;padding:58px 64px 52px}
+        .brand{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px;line-height:1;margin-bottom:36px}
+        .brand svg{display:block;flex:none}
+        .brand b{color:var(--heading);font-weight:600;font-size:12px;letter-spacing:.02em}
+        .brand i{width:1px;height:11px;background:var(--rule);margin:0 2px}
+        h1{font-family:"Noto Serif SC","Source Han Serif SC",STZhongsong,SimSun,serif;font-size:34px;line-height:1.42;font-weight:600;color:var(--heading);margin:0 0 16px}
+        header{border-bottom:1px solid var(--rule);padding-bottom:26px;margin-bottom:32px}
+        .meta{color:var(--muted);font-size:13px;line-height:1.9}
+        .source{margin-top:4px;font-size:12.5px}
+        a{color:var(--accent);text-decoration:underline;text-decoration-color:#b9cabd;text-underline-offset:3px}
+        a:hover{text-decoration-color:var(--accent)}
+        img{max-width:100%!important;height:auto!important;border-radius:4px}
+        figure{margin:26px 0}
+        figcaption{color:var(--faint);font-size:12px;line-height:1.7;margin-top:7px;text-align:center}
+        p{margin:0 0 1.15em}
+        main{font-size:16.5px}
+        main h2,main h3,main h4{font-family:"Noto Serif SC","Source Han Serif SC",STZhongsong,SimSun,serif;color:var(--heading);line-height:1.5;margin:1.9em 0 .7em}
+        main h2{font-size:25px}main h3{font-size:20px}main h4{font-size:17px}
+        pre{white-space:pre-wrap;background:#f2ecdf;border:1px solid var(--rule);padding:16px 18px;border-radius:6px;font:13px/1.75 "Cascadia Mono",Consolas,monospace;overflow:auto}
+        code{font-family:"Cascadia Mono",Consolas,monospace;font-size:.9em;background:#f2ecdf;border-radius:3px;padding:.1em .35em}
+        pre code{background:none;padding:0}
+        blockquote{border-left:2px solid var(--seal);margin:24px 0;padding:2px 0 2px 18px;color:#5c655c}
+        blockquote p:last-child{margin-bottom:0}
+        table{border-collapse:collapse;max-width:100%;font-size:14px;margin:24px 0}
+        th,td{border:1px solid var(--rule);padding:9px 11px;text-align:left;vertical-align:top}
+        th{background:#f3ede1;color:var(--heading);font-weight:600}
+        aside{background:var(--note);border:1px solid #e5d5b7;border-left:2px solid var(--seal);padding:12px 15px;font-size:12.5px;line-height:1.8;margin:0 0 24px;border-radius:0 5px 5px 0;color:#6d5a3d}
+        aside strong{color:#5f4b2e}
+        audio{width:100%}
+        footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--rule);display:flex;align-items:center;gap:8px;color:var(--faint);font-size:11px;line-height:1.7}
+        ::selection{background:#e3ebe3}
+        @media (max-width:720px){body{padding:0}.sheet{border:0;border-radius:0;padding:34px 22px 40px}h1{font-size:28px}main{font-size:16px}}
+        @media print{html,body{background:#fff}.sheet{max-width:none;border:0;border-radius:0;padding:0}body{padding:0;font-size:10.5pt;line-height:1.75}h1{font-size:24pt}.brand,footer{display:none}aside{break-inside:avoid}a{color:inherit;text-decoration:none}pre,img,blockquote,table{break-inside:avoid}}
         """;
 
     public static string Html(Article article, ArticleContent content, IReadOnlyDictionary<string, string> assets)
@@ -32,19 +59,32 @@ public static class MarkupWriter
         var body = HtmlSanitizer.Localize(content.BodyHtml, assets);
         var warnings = content.Warnings.Count == 0
             ? ""
-            : "<aside>" + Encode(string.Join(" / ", content.Warnings)) + "</aside>";
+            : "<aside><strong>归档提示</strong><br>" + Encode(string.Join("；", content.Warnings)) + "</aside>";
         var meta = string.Join(" · ", new[] { article.Account, article.Author, article.PublishedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") }
             .Where(value => !string.IsNullOrWhiteSpace(value)));
+        const string mark = """
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <rect width="24" height="24" rx="5.5" fill="#173b32"/>
+              <path d="M11.2 3.1L12.5 5.3" stroke="#c65a3d" stroke-width="2.3" stroke-linecap="round"/>
+              <path d="M4.9 8.3H19.1" stroke="#f5efe2" stroke-width="2.2" stroke-linecap="round"/>
+              <path d="M13.2 10.6L5.3 20.2" stroke="#f5efe2" stroke-width="2.2" stroke-linecap="round"/>
+              <path d="M10.8 10.6L18.7 20.2" stroke="#f5efe2" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+            """;
         return $$"""
             <!doctype html>
             <html lang="zh-CN"><head><meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="color-scheme" content="light">
             <title>{{Encode(article.Title)}}</title>
             <style>{{Css}}</style></head>
-            <body><header><h1>{{Encode(article.Title)}}</h1><div class="meta">{{Encode(meta)}}</div>
-            <div class="meta"><a href="{{Encode(article.Url)}}">查看原文</a></div></header>
+            <body><article class="sheet"><header>
+            <div class="brand">{{mark}}<b>文存</b><i></i><span>本地归档</span></div>
+            <h1>{{Encode(article.Title)}}</h1><div class="meta">{{Encode(meta)}}</div>
+            <div class="source"><a href="{{Encode(article.Url)}}">查看原文</a></div></header>
             {{warnings}}<main>{{body}}</main>
-            <footer>文存 · 本地归档 · {{content.FetchedAt.ToLocalTime():yyyy-MM-dd HH:mm}}</footer></body></html>
+            <footer>{{mark}}<span>文存 · 本地归档 · {{content.FetchedAt.ToLocalTime():yyyy-MM-dd HH:mm}}</span></footer>
+            </article></body></html>
             """;
     }
 

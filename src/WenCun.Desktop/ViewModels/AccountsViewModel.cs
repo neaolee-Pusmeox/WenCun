@@ -40,9 +40,10 @@ public sealed class AccountsViewModel : ObservableObject
     }
 
     public ObservableCollection<AccountRow> Items { get; } = [];
-    public string Summary => Items.Count == 0
-        ? "还没有跟踪的公众号"
-        : $"共 {Items.Count} 个公众号 · 已保存 {Items.Sum(row => row.Account.Saved)} 篇 · 采集失败 {Items.Sum(row => row.Account.Failed)} · 导出失败 {Items.Sum(row => row.Account.ExportFailed)} · 待采集 {Items.Sum(row => row.Pending)}";
+    public int AccountCount => Items.Count;
+    public int SavedTotal => Items.Sum(row => row.Account.Saved);
+    public int FailedTotal => Items.Sum(row => row.Account.Failed);
+    public int PendingTotal => Items.Sum(row => row.Pending);
     public bool IsEmpty => Items.Count == 0;
     public ICommand RefreshCommand { get; }
     public ICommand ViewCommand { get; }
@@ -70,8 +71,11 @@ public sealed class AccountsViewModel : ObservableObject
         foreach (var discovered in pending.Values)
             Items.Add(new AccountRow(new Account(discovered.Biz, discovered.Account, 0, 0, 0, 0, 0,
                 discovered.Articles.Max(article => article.PublishedAt), discovered.LastDiscovered, discovered.Complete), discovered.Articles.Count));
-        OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(IsEmpty));
+        OnPropertyChanged(nameof(AccountCount));
+        OnPropertyChanged(nameof(SavedTotal));
+        OnPropertyChanged(nameof(FailedTotal));
+        OnPropertyChanged(nameof(PendingTotal));
     }
 
     public void SetLibrary(Library library)

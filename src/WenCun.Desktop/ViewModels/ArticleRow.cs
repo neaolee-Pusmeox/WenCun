@@ -1,3 +1,4 @@
+using System.Globalization;
 using WenCun.Core.Domain;
 using WenCun.Desktop.Infrastructure;
 
@@ -47,8 +48,10 @@ public sealed class AccountRow(Account account, int pending = 0)
     public Account Account { get; } = account;
     public int Pending { get; } = pending;
     public string Name => string.IsNullOrWhiteSpace(Account.Name) ? Account.Biz : Account.Name;
+    public string Initial => string.IsNullOrWhiteSpace(Name) ? "文" : StringInfo.GetNextTextElement(Name);
     public string Counts => Account.Count + " 篇";
     public string Stats => $"已保存 {Account.Saved} · 采集失败 {Account.Failed} · 已导出 {Account.Exported} · 导出失败 {Account.ExportFailed} · 待采集 {Pending}";
+    public string ShortStats => $"已保存 {Account.Saved} · 待采集 {Pending} · 失败 {Account.Failed}";
     public string LatestText => Account.Latest is { } latest ? "最近文章 " + latest.ToLocalTime().ToString("yyyy-MM-dd") : "还没有文章";
     public string CollectedText => Account.LastCollected is { } time ? "上次采集 " + time.ToLocalTime().ToString("MM-dd HH:mm") : "尚未采集";
     public string StatusText => Account.Complete ? "目录已完整" : "目录未完成";

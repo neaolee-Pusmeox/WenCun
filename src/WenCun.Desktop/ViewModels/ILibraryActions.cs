@@ -8,10 +8,9 @@ public interface ILibraryActions
     void Read(Article article);
     Task RetryAsync(Article article);
     Task RetryAsync(IReadOnlyList<Article> articles);
-    Task ReexportAsync(Article article);
     Task ReexportAsync(IReadOnlyList<Article> articles);
     Task SavePendingAsync(IReadOnlyList<PendingArticle> articles);
-    void DeletePendingAsync(IReadOnlyList<PendingArticle> articles);
-    Task CleanupLegacyPendingAsync();
+    void DeletePending(IReadOnlyList<PendingArticle> articles);
+    void CleanupLegacyPending();
     void OpenFolder(Article article);
 }
