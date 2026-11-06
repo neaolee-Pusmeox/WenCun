@@ -7,6 +7,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Themes/Light.xaml"/>
                 <ResourceDictionary Source="Themes/Controls.xaml"/>
+                <ResourceDictionary Source="Assets/wencun-mark.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <infra:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
             <infra:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>

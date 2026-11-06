@@ -55,13 +55,13 @@ public sealed class LibraryViewModel : ObservableObject
         SaveSelectedPendingCommand = new RelayCommand(() =>
         {
             var pending = Items.Where(row => row.Selected && row.Pending is not null).Select(row => row.Pending!).ToArray();
-            if (pending.Length == 0) { _status("请先勾选要保存的待采集文章。"); return; }
+            if (pending.Length == 0) { _status("请先勾选要保存的文章。"); return; }
             _ = _actions.SavePendingAsync(pending);
         });
         CleanupLegacyCommand = new RelayCommand(_actions.CleanupLegacyPending);
         RetryFailedCommand = new RelayCommand(() =>
         {
-            if (_isPendingView) { _status("待采集文章还没有正文，先保存。"); return; }
+            if (_isPendingView) { _status("文章还没有正文，请先保存。"); return; }
             var failed = _library.FailedArticles(_selectedAccount?.Account.Biz);
             if (failed.Count == 0) { _status("当前范围没有采集失败的文章。"); return; }
             _ = _actions.RetryAsync(failed);
@@ -95,8 +95,8 @@ public sealed class LibraryViewModel : ObservableObject
     public bool IsAllAccounts => _selectedAccount is null;
     public string AccountFilterText => _selectedAccount is null ? "全部公众号" : _selectedAccount.Name;
     public string AllAccountsText => _isPendingView
-        ? "全部待采集 · " + Accounts.Sum(row => row.Account.Count) + " 篇"
-        : "全部公众号 · " + Accounts.Sum(row => row.Account.Count) + " 篇";
+        ? $"全部公众号（{Accounts.Sum(row => row.Account.Count)} 篇待保存）"
+        : $"全部公众号（{Accounts.Sum(row => row.Account.Count)} 篇）";
     public bool ShowAll { get => !_isPendingView && _state is null; set { if (value) SetState(null); } }
     public bool ShowReady { get => !_isPendingView && _state == ContentState.Ready; set { if (value) SetState(ContentState.Ready); } }
     public bool ShowPending
@@ -121,16 +121,16 @@ public sealed class LibraryViewModel : ObservableObject
     public string SortText => _descending ? "最新在前" : "最早在前";
     public string PageText => _page + " / " + Math.Max(1, _totalPages);
     public string Summary => _isPendingView
-        ? "共 " + _total + " 篇待采集" + (_selectedAccount is null ? "" : " · " + _selectedAccount.Name)
-        : "共 " + _total + " 篇" + (_selectedAccount is null ? "" : " · " + _selectedAccount.Name);
+        ? $"{_total} 篇待保存" + (_selectedAccount is null ? "" : $"，{_selectedAccount.Name}")
+        : $"{_total} 篇文章" + (_selectedAccount is null ? "" : $"，{_selectedAccount.Name}");
     public bool IsEmpty => Items.Count == 0;
     public string EmptyText => _search.Length > 0
         ? "没有匹配的文章。"
         : _isPendingView
-            ? "还没有待采集文章。去「采集」页嗅探，或点「清理旧待采集」删除旧记录。"
+            ? "没有待保存的文章。"
             : _selectedAccount is not null
                 ? "这个公众号还没有文章。"
-                : "资料库还是空的，去「采集」页开始吧。";
+                : "保存的文章会出现在这里。";
 
     public bool AllSelected
     {
@@ -296,7 +296,7 @@ public sealed class LibraryViewModel : ObservableObject
     {
         if (_isPendingView)
         {
-            _status("待采集文章还没有正文，保存后再导出。");
+            _status("文章还没有正文，保存后再导出。");
             return;
         }
         var selected = Items.Where(item => item.Selected).Select(item => item.Article).ToArray();
@@ -314,7 +314,7 @@ public sealed class LibraryViewModel : ObservableObject
         var selected = Items.Where(item => item.Selected).ToArray();
         if (selected.Length == 0)
         {
-            _status(_isPendingView ? "请先勾选要删除的待采集文章。" : "请先勾选要删除的文章。");
+            _status("请先勾选要删除的文章。");
             return;
         }
         if (_isPendingView)

@@ -104,7 +104,7 @@ GetCheckpoint 读取 accounts 表，不存在返回 (0,false)。SaveCheckpoint �
 
 MainViewModel 持有 Library、三个页面与保存/导出信号量。嗅探也检查工作状态；切库、删除、新任务不能与当前任务交叉。客户端按任务释放。
 
-PendingViewModel.Load 保留已选项，新文章默认不勾选。AccountsViewModel 合并 SQLite 和 pending。LibraryViewModel 的“待采集”分支同样读取 pending。
+首次启动且没有文库或待保存数据时进入“采集”；已有数据时进入“资料库”。目录获取、保存和导出的界面动作统一使用“获取目录”“保存”“导出”，不将会话、捕获等内部实现术语暴露给普通用户。保存所选逐篇显示进度，成功后自动进入资料库；PendingViewModel.Load 保留已选项，新文章默认不勾选，保存按钮显示当前勾选数量。AccountsViewModel 合并 SQLite 和 pending。LibraryViewModel 的“待保存”分支同样读取 pending。
 
 配置持久化、ReaderWindow 预览目录和 WebView2 用户数据目录都使用构造函数传入的 appRoot。测试必须使用临时目录，不能用静态 App.AppRoot 覆盖调用者隔离。
 
@@ -117,8 +117,10 @@ PendingViewModel.Load 保留已选项，新文章默认不勾选。AccountsViewM
 | 导出资源与路径 | ExportPaths/Exporter/FileBoundary | 同名冲突、旧文件保护、删除归属、ReaderWindow |
 | 新格式 | Models/Exporter/AppConfig/CollectViewModel/XAML | 枚举值、选项、失败状态、README |
 | 数据库 | Library.Schema/Migrate | 旧库复制、默认值、查找统计、用户备份 |
-| 主题、控件、图标、字体 | Themes/Light.xaml、Dark.xaml、Controls.xaml、Assets/wencun.ico、Assets/Fonts | 三页浅/深色、1000 宽窗口、焦点与选中态、字体许可 |
+| 主题、控件、图标、字体 | Themes/Light.xaml、Dark.xaml、Controls.xaml、Assets/wencun-icon.svg、Assets/wencun.ico、Assets/wencun-mark.xaml、Assets/Fonts | 三页浅/深色、1000 宽窗口、焦点与选中态、32px 图标、字体许可 |
 | 阅读页与导出样式 | MarkupWriter.Css/Html | HTML 导出、ReaderWindow、打印与窄屏 |
+
+图标母版和多尺寸 ICO 是正式源码资产。`scripts/render-icon.py` 读取 `Assets/wencun-icon.svg`，更新 `Assets/wencun-icon.png` 与 `Assets/wencun.ico`，并在 `.tools/logo/soft-3d/` 输出仅供人工检查的图片。脚本依赖 Python、Pillow、Playwright 和本机 Microsoft Edge，不参与正常构建或测试；`.tools` 中的日志、检查图和 binlog 都是可删除的中间产物，不能作为修改入口或提交内容。
 
 ## 验证与发布
 
@@ -130,6 +132,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish.ps1 -Output 
 `verify.ps1` 依次校验版本镜像、构建和全部测试；`-SkipNativeUi` 只用于没有桌面会话的自动化环境。发布版本、标签和远程步骤按 [发布规约](RELEASE.md) 执行，不在这里另写一套顺序。
 
 NativeUiTests 需要 Windows 桌面，会短暂创建真实 MainWindow 并输出截图路径；使用普通 Application 测试宿主加载生产主题，不执行 App.OnStartup。它验证实际绑定与可见文字，不等于微信或 PDF 现场验收。
+
+原生 smoke 同时覆盖 1000 宽窗口下失败与已保存文章同屏：状态标签与表头在固定列内居中，失败行的“阅读”“重试”“文件夹”完整显示且互不重叠。截图与临时文库位于 `%TEMP%\WenCunUiTests`，复核后可删除；验证结束后清理当日测试临时目录，不删除其他日期的验收资料。
 
 既有 CaptureTests 创建并清理独立 CNG 密钥，不加入信任存储；新增 Capture 回归使用假代理和临时数据。真实系统代理、证书安装应单独验收。
 

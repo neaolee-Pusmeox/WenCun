@@ -31,7 +31,7 @@ public sealed class DesktopRegressionTests : IDisposable
     public void RefreshDuringDiscoveryKeepsExistingSelection()
     {
         Store.Merge("biz", "公众号甲", [Item], 10, false);
-        var vm = new PendingViewModel(Store, _ => null, _ => { }, _ => { }, _ => { }, _ => { }, _ => { });
+        var vm = new PendingViewModel(Store, _ => null, _ => { }, _ => { }, _ => { });
         vm.Load();
         vm.Items[0].Selected = true;
         Store.Merge("biz", "公众号甲", [Item with { Id = "second", Title = "第二篇" }], 20, true);
@@ -39,6 +39,21 @@ public sealed class DesktopRegressionTests : IDisposable
         Assert.Equal(2, vm.Items.Count);
         Assert.True(vm.Items.Single(row => row.Article.Id == "id").Selected);
         Assert.False(vm.Items.Single(row => row.Article.Id == "second").Selected);
+        Assert.Equal("保存所选（1 篇）", vm.SaveText);
+        vm.AllSelected = true;
+        Assert.Equal("保存所选（2 篇）", vm.SaveText);
+        vm.AllSelected = false;
+        Assert.Equal("保存所选", vm.SaveText);
+    }
+
+    [Fact]
+    public void MainWindowStartsAtTheUsefulEntryPoint()
+    {
+        var empty = new MainViewModel(Library, _root, null);
+        Assert.Equal("Collect", empty.Section);
+        Store.Merge("biz", "公众号甲", [Item], 10, false);
+        var pending = new MainViewModel(Library, _root, null);
+        Assert.Equal("Library", pending.Section);
     }
 
     [Fact]

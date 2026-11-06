@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 640 640">
+  <defs>
+    <linearGradient id="ground" x1="76" y1="52" x2="568" y2="608" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#356C56"/>
+      <stop offset="1" stop-color="#173B32"/>
+    </linearGradient>
+    <radialGradient id="ground-light" cx="0" cy="0" r="1" gradientTransform="translate(151 103) rotate(51) scale(485)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8CA88A" stop-opacity=".32"/>
+      <stop offset="1" stop-color="#8CA88A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="paper" x1="213" y1="118" x2="490" y2="396" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFDF2"/>
+      <stop offset=".58" stop-color="#F5EBD8"/>
+      <stop offset="1" stop-color="#DCCCB1"/>
+    </linearGradient>
+    <linearGradient id="paper-edge" x1="220" y1="145" x2="476" y2="417" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E8DCC5"/>
+      <stop offset="1" stop-color="#B8A88B"/>
+    </linearGradient>
+    <linearGradient id="paper-line" x1="236" y1="206" x2="416" y2="282" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#557460"/>
+      <stop offset="1" stop-color="#365746"/>
+    </linearGradient>
+    <linearGradient id="pocket-back" x1="165" y1="287" x2="480" y2="512" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2B5946"/>
+      <stop offset="1" stop-color="#122E27"/>
+    </linearGradient>
+    <linearGradient id="pocket" x1="132" y1="336" x2="488" y2="540" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#659071"/>
+      <stop offset=".42" stop-color="#48765B"/>
+      <stop offset="1" stop-color="#28513F"/>
+    </linearGradient>
+    <linearGradient id="lip" x1="144" y1="348" x2="477" y2="382" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#90AB84"/>
+      <stop offset=".55" stop-color="#6C9372"/>
+      <stop offset="1" stop-color="#436C53"/>
+    </linearGradient>
+    <linearGradient id="seal" x1="437" y1="139" x2="510" y2="260" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E08A63"/>
+      <stop offset=".4" stop-color="#C76043"/>
+      <stop offset="1" stop-color="#983C2D"/>
+    </linearGradient>
+    <filter id="subject-shadow" x="-30%" y="-30%" width="170%" height="180%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="23" stdDeviation="19" flood-color="#0C241D" flood-opacity=".34"/>
+    </filter>
+    <filter id="paper-shadow" x="-30%" y="-30%" width="170%" height="180%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="7" dy="13" stdDeviation="10" flood-color="#102B22" flood-opacity=".27"/>
+    </filter>
+    <filter id="seal-shadow" x="-70%" y="-40%" width="240%" height="210%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="6" dy="11" stdDeviation="7" flood-color="#583B2A" flood-opacity=".27"/>
+    </filter>
+    <filter id="soft-light" x="-30%" y="-80%" width="160%" height="260%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+
+  <rect width="640" height="640" rx="142" fill="url(#ground)"/>
+  <rect width="640" height="640" rx="142" fill="url(#ground-light)"/>
+  <rect x="5" y="5" width="630" height="630" rx="137" fill="none" stroke="#D4DFC4" stroke-opacity=".12" stroke-width="4"/>
+
+  <g filter="url(#subject-shadow)">
+    <rect x="92" y="291" width="466" height="230" rx="69" fill="url(#pocket-back)"/>
+    <rect x="112" y="310" width="426" height="91" rx="44" fill="#102D25"/>
+
+    <g transform="rotate(-7 360 266)" filter="url(#paper-shadow)">
+      <rect x="182" y="126" width="362" height="293" rx="49" fill="url(#paper-edge)"/>
+      <rect x="182" y="111" width="362" height="293" rx="49" fill="url(#paper)"/>
+      <path d="M228 113H493C519 113 541 134 541 160" fill="none" stroke="#FFFFFF" stroke-opacity=".66" stroke-width="7" stroke-linecap="round"/>
+      <rect x="229" y="209" width="209" height="31" rx="15.5" fill="url(#paper-line)"/>
+      <rect x="229" y="269" width="137" height="31" rx="15.5" fill="url(#paper-line)"/>
+    </g>
+
+    <g transform="rotate(13 478 191)" filter="url(#seal-shadow)">
+      <rect x="438" y="132" width="82" height="123" rx="27" fill="url(#seal)"/>
+      <path d="M459 143H491C501 143 508 151 508 161" fill="none" stroke="#FFC4A0" stroke-opacity=".54" stroke-width="6" stroke-linecap="round"/>
+    </g>
+
+    <path d="M91 366C91 346 107 330 127 330H523C543 330 559 346 559 366V458C559 503 523 539 478 539H172C127 539 91 503 91 458Z" fill="url(#pocket)"/>
+    <path d="M127 330H523C543 330 559 346 559 366V373H91V366C91 346 107 330 127 330Z" fill="url(#lip)"/>
+    <path d="M132 344H510" fill="none" stroke="#C4D2AC" stroke-opacity=".37" stroke-width="7" stroke-linecap="round"/>
+    <path d="M109 397V455C109 492 137 520 174 520" fill="none" stroke="#B5C69D" stroke-opacity=".16" stroke-width="9" stroke-linecap="round"/>
+    <ellipse cx="269" cy="358" rx="115" ry="9" fill="#E0E4BD" opacity=".11" filter="url(#soft-light)"/>
+  </g>
+</svg>

@@ -64,11 +64,11 @@ public static class MarkupWriter
             .Where(value => !string.IsNullOrWhiteSpace(value)));
         const string mark = """
             <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <rect width="24" height="24" rx="5.5" fill="#173b32"/>
-              <path d="M11.2 3.1L12.5 5.3" stroke="#c65a3d" stroke-width="2.3" stroke-linecap="round"/>
-              <path d="M4.9 8.3H19.1" stroke="#f5efe2" stroke-width="2.2" stroke-linecap="round"/>
-              <path d="M13.2 10.6L5.3 20.2" stroke="#f5efe2" stroke-width="2.2" stroke-linecap="round"/>
-              <path d="M10.8 10.6L18.7 20.2" stroke="#f5efe2" stroke-width="2.2" stroke-linecap="round"/>
+              <path d="M3 8.3C3 7.6 3.6 7 4.3 7H19.7C20.4 7 21 7.6 21 8.3V9.8H3Z" fill="#173b32" opacity=".56"/>
+              <path d="M8.3 4.5L15.4 3.9C16.1 3.8 16.8 4.3 16.9 5L17.6 10.9H7.9L7.5 5.6C7.4 5 7.7 4.6 8.3 4.5Z" fill="#f5efe2" stroke="#d8d0bf" stroke-width=".35"/>
+              <path d="M9.8 6.8L14.5 6.3M10 8.5L13.3 8.2" stroke="#315441" stroke-width="1.05" stroke-linecap="round"/>
+              <path d="M15.2 5L16.9 5.4C17.3 5.5 17.6 5.9 17.5 6.4L17.2 8.8C17.1 9.2 16.7 9.5 16.3 9.4L14.6 9C14.2 8.9 13.9 8.5 14 8L14.3 5.6C14.4 5.2 14.8 4.9 15.2 5Z" fill="#c65a3d"/>
+              <path d="M3 10.1H21V17.2C21 19.1 19.5 20.6 17.6 20.6H6.4C4.5 20.6 3 19.1 3 17.2Z" fill="#173b32"/>
             </svg>
             """;
         return $$"""

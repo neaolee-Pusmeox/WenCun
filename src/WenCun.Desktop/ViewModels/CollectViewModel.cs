@@ -27,8 +27,9 @@ public sealed class CollectViewModel : ObservableObject
     private string _expectedAccount = "";
     private bool _consent;
     private bool _busy;
-    private string _state = "空闲";
-    private string _detail = "";
+    private string _state = "从公众号获取文章目录";
+    private string _detail = "在微信中打开目标公众号的一篇文章。";
+    private bool _showCertificate;
     private int _pages;
     private int _found;
     private int _pendingCount;
@@ -48,12 +49,12 @@ public sealed class CollectViewModel : ObservableObject
         ChangeLibraryCommand = new RelayCommand(() => ChangeLibraryRequested?.Invoke());
         RemoveCertificateCommand = new RelayCommand(() =>
         {
-            if (IsBusy) { Detail = "请先停止嗅探，再移除证书。"; return; }
+            if (IsBusy) { Detail = "请先停止获取目录，再移除证书。"; return; }
             try
             {
                 LocalCaptureCertificate.RemovePersistent();
-                State = "已移除本地证书";
-                Detail = "下次采集会重新安装一次。";
+                State = "本地证书已移除";
+                Detail = "下次获取目录时会重新安装。";
             }
             catch (Exception ex)
             {
@@ -61,6 +62,7 @@ public sealed class CollectViewModel : ObservableObject
                 Detail = ex.Message;
             }
         });
+        ToggleCertificateCommand = new RelayCommand(() => ShowCertificate = !ShowCertificate);
     }
 
     public event Action? ChangeLibraryRequested;
@@ -75,6 +77,7 @@ public sealed class CollectViewModel : ObservableObject
         }
     }
     public bool CanEditSettings => !IsBusy;
+    public bool ShowCertificate { get => _showCertificate; private set => Set(ref _showCertificate, value); }
     public string State { get => _state; private set => Set(ref _state, value); }
     public string Detail { get => _detail; private set => Set(ref _detail, value); }
     public int PageCount => _pages;
@@ -102,6 +105,7 @@ public sealed class CollectViewModel : ObservableObject
     public ICommand StopCommand { get; }
     public ICommand ChangeLibraryCommand { get; }
     public ICommand RemoveCertificateCommand { get; }
+    public ICommand ToggleCertificateCommand { get; }
 
     public void SetLibrary(Library library)
     {
@@ -115,8 +119,8 @@ public sealed class CollectViewModel : ObservableObject
     {
         _expectedBiz = account.Biz;
         _expectedAccount = string.IsNullOrWhiteSpace(account.Name) ? account.Biz : account.Name;
-        State = "目标：" + _expectedAccount;
-        Detail = "勾选同意后点击开始嗅探。";
+        State = "获取“" + _expectedAccount + "”的目录";
+        Detail = "点击“获取目录”，然后在微信中打开这个公众号的一篇文章。";
     }
 
     private bool HasFormat(string name) =>
@@ -151,10 +155,10 @@ public sealed class CollectViewModel : ObservableObject
     private async Task StartAsync()
     {
         if (IsBusy) return;
-        if (!_canStart()) { State = "正在保存或导出，请等待当前任务结束。"; return; }
+        if (!_canStart()) { State = "另一项任务正在进行"; Detail = "保存或导出结束后即可获取目录。"; return; }
         if (!Consent)
         {
-            State = "请先勾选同意";
+            State = "请先同意证书和代理设置";
             return;
         }
         IsBusy = true;
@@ -169,24 +173,24 @@ public sealed class CollectViewModel : ObservableObject
             proxy = new CaptureProxy(_appRoot, _expectedBiz);
             var captured = new TaskCompletionSource<Session>(TaskCreationOptions.RunContinuationsAsynchronously);
             proxy.Captured += session => captured.TrySetResult(session);
-            State = "准备本地证书…";
-            Detail = "首次使用会安装一次本地证书（Windows 会弹一次安全警告）；之后采集不再弹窗。";
+            State = "正在准备连接";
+            Detail = "首次使用时，请在 Windows 提示中允许安装本地证书。";
             await Task.Run(proxy.Start);
             State = _expectedAccount.Length > 0
-                ? $"等待微信请求：请在微信中打开「{_expectedAccount}」的一篇尚未缓存的文章"
-                : "等待微信请求：请在微信中打开目标公众号的一篇尚未缓存的文章";
-            Detail = "已打开过的文章刷新可能走缓存，不会产生网络请求。最多等待 3 分钟。";
+                ? $"请在微信中打开“{_expectedAccount}”的一篇文章"
+                : "请在微信中打开目标公众号的一篇文章";
+            Detail = "从公众号主页进入历史消息，选择一篇近期没打开过的文章。等待时间最长为 3 分钟。";
             using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
             var session = await captured.Task.WaitAsync(linked.Token);
             _session = session;
             OnPropertyChanged(nameof(LastSession));
-            State = "正在恢复网络…";
-            Detail = "正在恢复代理…";
+            State = "正在读取文章目录";
+            Detail = "已连接微信，正在恢复网络设置。";
             var warnings = await proxy.StopAsync();
             if (warnings.Count > 0) throw new IOException(string.Join("；", warnings));
-            State = "正在嗅探目录…";
-            Detail = "只读取目录，不保存正文；探明后在下方选择要保存的文章。";
+            State = "正在读取文章目录";
+            Detail = "目录会逐页显示在下方，此时不会保存文章正文。";
             using var client = new WeChatClient();
             var collector = new Collector(_library, client, _pending, App.Config.ToSaveOptions(), _pdfRenderer);
             var progress = new Progress<CollectProgress>(report =>
@@ -195,28 +199,28 @@ public sealed class CollectViewModel : ObservableObject
                 _found = report.Found;
                 _pendingCount = report.Saved;
                 NotifyCounts();
-                Detail = report.Stage + " · " + report.Detail;
+                Detail = report.Detail;
                 _refreshPending();
             });
             var name = string.IsNullOrWhiteSpace(session.Account) ? _expectedAccount : session.Account;
             var total = await collector.DiscoverAsync(session, session.Biz, name, progress, ct);
-            State = "已探明目录";
-            Detail = $"待采集 {total} 篇，在下方选择要保存的文章。";
+            State = "目录已获取";
+            Detail = $"找到 {total} 篇待保存文章，在下方勾选后保存。";
             _discovered();
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            State = "没有捕获到微信请求";
-            Detail = "可能刷新的是已缓存文章。请换一篇尚未打开过的文章，或先在微信里打开文章列表再点开一篇。";
+            State = "没有读取到微信文章";
+            Detail = "请从公众号主页进入历史消息，打开一篇近期没读过的文章后重试。";
         }
         catch (OperationCanceledException)
         {
             State = "已停止";
-            Detail = "已探明的目录不会丢失。";
+            Detail = "已获取的文章目录已保留。";
         }
         catch (Exception ex)
         {
-            State = "嗅探失败";
+            State = "获取目录失败";
             Detail = ex.Message;
         }
         finally
