@@ -2,6 +2,20 @@
 
 本文描述 WenCun.slnx 对应的当前实现。旧 WeChatExport.* 目录与历史文档不作为当前能力依据。
 
+## 0.1.2 迭代记录（2026-11-09）
+
+本轮修复采集页比例失衡、最大化黑边，以及选择、搜索和阅读恢复中的交互断点；文库结构、采集网络边界和导出格式保持兼容。
+
+| 改动 | 主要入口 | 回归范围 |
+| --- | --- | --- |
+| 文章工作区与保存侧栏、公众号下拉筛选 | MainWindow、PendingViewModel、Controls.xaml | 两主题、八种窗口尺寸、筛选刷新、独立滚动和固定保存按钮 |
+| 最大化黑边 | MainWindow 构造函数 | 两主题反复最大化与恢复，原生客户区和 WPF 内容尺寸一致 |
+| 选择、搜索与跨页恢复 | LibraryViewModel、PendingViewModel、MainViewModel、CollectViewModel | 半选、分页、作者搜索、目标公众号、保存结果可见和删除确认 |
+| 阅读加载、失败重试、主题与窗口隔离 | ReaderWindow | 加载与关闭竞态、同文多窗口、外部链接与浅深正文 |
+| 图标、控件和输入辨识度 | Themes、Assets、render-icon.py | ICO 方向与透明度、交互轮廓、焦点和中文输入高度 |
+
+版本源为 `Directory.Build.props`，对应更新说明在 `CHANGELOG.md`；本地 Windows x64 自包含包使用 `publish/release-0.1.2`。验证继续执行 `scripts/verify.ps1` 和图标回归 `python -B scripts/test_render_icon.py`。真实微信、企业代理、证书安装清理和业务 PDF 的现场验收仍需单独完成，完整记录见 [体验走查](UX-REVIEW-2026-11-09.md)。
+
 ## 模块与依赖
 
 | 模块 | 职责 | 主要依赖 |
@@ -106,7 +120,19 @@ MainViewModel 持有 Library、三个页面与保存/导出信号量。嗅探也
 
 首次启动且没有文库或待保存数据时进入“采集”；已有数据时进入“资料库”。目录获取、保存和导出的界面动作统一使用“获取目录”“保存”“导出”，不将会话、捕获等内部实现术语暴露给普通用户。保存所选逐篇显示进度，成功后自动进入资料库；PendingViewModel.Load 保留已选项，新文章默认不勾选，保存按钮显示当前勾选数量。AccountsViewModel 合并 SQLite 和 pending。LibraryViewModel 的“待保存”分支同样读取 pending。
 
-配置持久化、ReaderWindow 预览目录和 WebView2 用户数据目录都使用构造函数传入的 appRoot。测试必须使用临时目录，不能用静态 App.AppRoot 覆盖调用者隔离。
+只有待保存数据时初始筛选直接选“待保存”。保存或重试缺少对应会话时，以所操作文章的公众号作为下一步目标；保存成功后清理阻挡结果的旧筛选并显示保存范围。采集、保存、导出期间不能改写目标公众号或保存设置。
+
+资料库的选择状态按当前页计算，采集选择按当前显示范围计算。`SelectionState` 表示未选 / 半选 / 全选，表头使用 `ToggleSelectionCommand` 避免 WPF 三态默认循环造成点击含义不一致；旧 `AllSelected` 仍可使用。行选择变化、重新载入和任务状态变化会更新相关命令可用性。待保存搜索同时匹配标题、公众号、作者；`ClearFiltersCommand` 提供空结果恢复。主窗口的 Ctrl+F 与 Esc 只操作资料库搜索。
+
+采集视图使用 `CollectPageRoot` 的 Auto / * 行和 `CollectWorkspace` 的弹性文章列 / 有界设置列，`PendingArticleScroll` 与 `SaveSettingsScroll` 独立滚动，底部保存与选择计数固定。`PendingViewModel.AccountChoices` 是稳定的 ObservableCollection，包含“全部公众号”占位项；`AccountFilter` 将其映射到既有 `SelectedAccount`，目录刷新时抑制绑定清空造成的范围变化。不能用每次返回新的延迟枚举替代它，否则 WPF 可能持有选中对象却失去选中索引。
+
+MainWindow 只限制初始 Width / Height，不持久限制 MaxWidth / MaxHeight。Windows 最大化窗口的原生边框在工作区外；将最大尺寸限制为工作区会让内容按较小约束绘制，在 125% DPI 的实测中右侧与底部各少 18px。
+
+`ConfirmPendingDeleteRequested` 把移除待保存条目的确认交给主窗口；没有确认处理器时不写入，默认按钮为取消。先检查任务互斥，再确认实际仍存在的条目；取消不更改清单。它与正文保存成功后由 Collector 移除 pending 的内部路径不同。
+
+ViewModel 的配置持久化与 WebView2 用户数据目录使用构造函数传入的 appRoot。测试必须使用临时目录，不能用静态 App.AppRoot 覆盖调用者隔离。
+
+阅读窗口每次创建使用独立临时预览目录，WebView2 用户数据环境按 `appRoot` 隔离。加载和故障反馈保留窗口，可重新创建阅读组件重试；关闭后晚到回调不恢复界面。同一份语义色通过仅预览生效的 CSS 注入阅读正文，导出 HTML 与打印契约保持独立。
 
 | 修改行为 | 入口 | 同步检查 |
 | --- | --- | --- |
@@ -132,6 +158,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish.ps1 -Output 
 `verify.ps1` 依次校验版本镜像、构建和全部测试；`-SkipNativeUi` 只用于没有桌面会话的自动化环境。发布版本、标签和远程步骤按 [发布规约](RELEASE.md) 执行，不在这里另写一套顺序。
 
 NativeUiTests 需要 Windows 桌面，会短暂创建真实 MainWindow 并输出截图路径；使用普通 Application 测试宿主加载生产主题，不执行 App.OnStartup。它验证实际绑定与可见文字，不等于微信或 PDF 现场验收。
+
+`SelectionUxTests` 与 `WorkflowUxTests` 验证批量范围、搜索恢复、启动与跨页任务以及删除确认；`VisualTokenTests` 验证色彩对比、三态模板与可见焦点。`ReaderUxTests` 覆盖原生阅读加载 / 故障恢复、同文多窗口和关闭竞态；模拟渲染器的测试不能代替真实 WebView2 验收。`-SkipNativeUi` 同时排除 MainWindow 与 ReaderWindow 的原生用例，正常开发验收不得使用此开关。
+
+修改图标生成脚本后，额外运行 `python -B scripts/test_render_icon.py`，它用不对称像素夹具检查 BMP ICO 的方向、尺寸、透明像素与按行对齐的 AND 遮罩，并验证浏览器实际渲染后的正式格式。
 
 原生 smoke 同时覆盖 1000 宽窗口下失败与已保存文章同屏：状态标签与表头在固定列内居中，失败行的“阅读”“重试”“文件夹”完整显示且互不重叠。截图与临时文库位于 `%TEMP%\WenCunUiTests`，复核后可删除；验证结束后清理当日测试临时目录，不删除其他日期的验收资料。
 

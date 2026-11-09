@@ -1,6 +1,8 @@
 # 文存 WenCun
 
-当前预发布版本：`0.1.1`。
+当前预发布版本：`0.1.2`。
+
+本次更新重设计采集页的文章选择与保存设置，修复最大化黑边，并完善批量选择、搜索与阅读恢复。详细变化见 [更新记录](CHANGELOG.md)。
 
 文存是 Windows 上的微信公众号文章归档工具：获取公众号历史目录，勾选文章后保存到本地文库，并导出 HTML、Markdown、TXT、Word 或 PDF。
 
@@ -16,6 +18,10 @@
 6. 在“资料库”阅读和搜索文章，在“公众号”查看待保存、已保存和导出状态。
 
 名称探测失败时暂时显示公众号标识，重新获取目录或成功保存文章后可补全。
+
+采集页通过公众号下拉框筛选待保存文章。文章列表与保存设置并排，各自滚动；“保存所选”固定在设置区底部，调整窗口大小或滚动长清单时仍可直接操作。
+
+只有待保存目录时，重启会直接显示“待保存”；缺少对应公众号连接时，保存操作会带着目标公众号和所选文章进入采集页。资料库支持 `Ctrl+F` 定位搜索、`Esc` 清空搜索，搜索无结果可直接清除筛选。全选只作用于当前列表范围，部分勾选显示半选和已选数量。
 
 ## 三个页面
 
@@ -75,6 +81,10 @@
 
 删除文章只删除数据库记录和正文，导出文件保留。删除公众号会尝试清理可确定属于它的资源和导出目录；共享旧目录、锁定文件或无法安全处理的路径可能保留。
 
+移除待保存条目前会确认，默认取消；它不删除已保存正文和导出文件。目录游标继续保留，重新获取目录不保证恢复已移除的条目。
+
+阅读窗口会显示加载与可重试的错误状态，正文随明暗外观切换；同一篇文章的多个窗口各用独立预览目录。点击网页链接会在系统浏览器打开，文存保留本地阅读位置。导出的 HTML 继续使用浅色纸面与原有打印样式。
+
 ## 开发与构建
 
 需要 Windows 和 `global.json` 指定的 .NET SDK（当前为 `10.0.401`，允许同功能带补丁升级）。脚本优先使用项目内 `.tools\dotnet\dotnet.exe`，否则从 PATH 查找 `dotnet`。
@@ -98,6 +108,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish.ps1 -Output 
 
 修改应用图标时，先编辑 `src/WenCun.Desktop/Assets/wencun-icon.svg`，再运行 `python scripts/render-icon.py`。脚本需要 Python、Pillow、Playwright 和本机 Microsoft Edge；生成物写入正式 `Assets`，检查图只写入被 Git 忽略的 `.tools/logo/soft-3d/`。
 
+图标修改后运行 `python -B scripts/test_render_icon.py`，核验真实 ICO 各尺寸的方向、透明边缘与遮罩；只查看 PNG 不能验证 Windows 图标。
+
 ## 连接边界
 
 嗅探临时修改当前用户的 WinINET HTTPS 代理，仅解密 `mp.weixin.qq.com`。其他 HTTPS 请求可能通过本地代理转发；当前实现不是按域名配置的 PAC，依赖企业代理的网络需要单独验证。
@@ -110,6 +122,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish.ps1 -Output 
 
 - [开发指南](docs/DEVELOPMENT.md)：架构、数据契约、调试、验证与修改入口。
 - [界面设计规范](docs/UI-DESIGN.md)：色彩、字体、标识、组件与阅读页约定。
+- [2026-11-09 产品体验走查](docs/UX-REVIEW-2026-11-09.md)：六维检查、高优先级修复、证据范围与后续验收方案。
 - [发布规约](docs/RELEASE.md)：版本源、唯一验证门禁、提交与发版路径。
 - [更新记录](CHANGELOG.md)：每个发布版本的界面、功能和维护变化。
 - [第三方组件与字体](THIRD-PARTY-NOTICES.md)：HarmonyOS Sans SC 许可与使用声明。

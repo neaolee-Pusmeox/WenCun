@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows.Input;
 using WenCun.Core.Domain;
 using WenCun.Core.Pending;
@@ -36,8 +37,9 @@ public sealed class PendingViewModel : ObservableObject
     private readonly Action<IReadOnlyList<PendingArticle>> _save;
     private readonly Action<IReadOnlyList<PendingArticle>> _delete;
     private readonly Action<string> _status;
+    private readonly PendingAccountRow _allAccountsChoice = new(new PendingAccount("", "全部公众号", 0, true, null, []));
     private PendingAccountRow? _selectedAccount;
-    private bool _allSelected;
+    private bool _updatingSelection;
     private bool _loading;
     private int _selectedCount;
 
@@ -50,14 +52,26 @@ public sealed class PendingViewModel : ObservableObject
         _save = save;
         _delete = delete;
         _status = status;
+        AccountChoices.Add(_allAccountsChoice);
         RefreshCommand = new RelayCommand(Load);
         SelectAllCommand = new RelayCommand(() => SelectedAccount = null);
-        SaveCommand = new RelayCommand(SaveSelected);
-        DeleteCommand = new RelayCommand(DeleteSelected);
+        // 表头单向绑定 SelectionState，用命令让半选点击变为全选。
+        ToggleSelectionCommand = new RelayCommand(() => AllSelected = !AllSelected, () => Items.Count > 0);
+        SaveCommand = new RelayCommand(SaveSelected, () => SelectedCount > 0);
+        DeleteCommand = new RelayCommand(DeleteSelected, () => SelectedCount > 0);
     }
 
     public ObservableCollection<PendingAccountRow> Accounts { get; } = [];
     public ObservableCollection<PendingArticleRow> Items { get; } = [];
+    public ObservableCollection<PendingAccountRow> AccountChoices { get; } = [];
+    public PendingAccountRow AccountFilter
+    {
+        get => _selectedAccount ?? _allAccountsChoice;
+        set
+        {
+            if (!_loading) SelectedAccount = ReferenceEquals(value, _allAccountsChoice) ? null : value;
+        }
+    }
 
     public PendingAccountRow? SelectedAccount
     {
@@ -66,6 +80,7 @@ public sealed class PendingViewModel : ObservableObject
         {
             if (!Set(ref _selectedAccount, value)) return;
             OnPropertyChanged(nameof(IsAllAccounts));
+            OnPropertyChanged(nameof(AccountFilter));
             OnPropertyChanged(nameof(Summary));
             if (!_loading) LoadItems();
         }
@@ -74,13 +89,20 @@ public sealed class PendingViewModel : ObservableObject
     public bool IsAllAccounts => _selectedAccount is null;
     public int SelectedCount { get => _selectedCount; private set { if (Set(ref _selectedCount, value)) OnPropertyChanged(nameof(SaveText)); } }
     public string SaveText => SelectedCount == 0 ? "保存所选" : $"保存所选（{SelectedCount} 篇）";
+    public string SelectionText => $"当前页已选 {SelectedCount} 篇";
+    public bool? SelectionState
+    {
+        get => SelectedCount == 0 ? false : SelectedCount == Items.Count ? true : null;
+        set => AllSelected = value != false;
+    }
     public bool AllSelected
     {
-        get => _allSelected;
+        get => Items.Count > 0 && SelectedCount == Items.Count;
         set
         {
-            if (!Set(ref _allSelected, value)) return;
-            foreach (var item in Items) item.Selected = value;
+            _updatingSelection = true;
+            try { foreach (var item in Items) item.Selected = value; }
+            finally { _updatingSelection = false; UpdateSelection(); }
         }
     }
 
@@ -93,8 +115,9 @@ public sealed class PendingViewModel : ObservableObject
 
     public ICommand RefreshCommand { get; }
     public ICommand SelectAllCommand { get; }
-    public ICommand SaveCommand { get; }
-    public ICommand DeleteCommand { get; }
+    public RelayCommand ToggleSelectionCommand { get; }
+    public RelayCommand SaveCommand { get; }
+    public RelayCommand DeleteCommand { get; }
 
     public void Load()
     {
@@ -104,6 +127,8 @@ public sealed class PendingViewModel : ObservableObject
         {
             var biz = _selectedAccount?.Account.Biz;
             Accounts.Clear();
+            AccountChoices.Clear();
+            AccountChoices.Add(_allAccountsChoice);
             foreach (var account in _store.LoadAll())
             {
                 var name = string.IsNullOrWhiteSpace(account.Account) ? _accountName(account.Biz) ?? account.Biz : account.Account;
@@ -115,9 +140,12 @@ public sealed class PendingViewModel : ObservableObject
                         Account = string.IsNullOrWhiteSpace(article.Account) ? name : article.Account
                     }).ToArray()
                 };
-                Accounts.Add(new PendingAccountRow(resolved));
+                var row = new PendingAccountRow(resolved);
+                Accounts.Add(row);
+                AccountChoices.Add(row);
             }
             _selectedAccount = biz is null ? null : Accounts.FirstOrDefault(row => row.Account.Biz == biz);
+            OnPropertyChanged(nameof(AccountFilter));
             OnPropertyChanged(nameof(SelectedAccount));
             OnPropertyChanged(nameof(IsAllAccounts));
             OnPropertyChanged(nameof(Summary));
@@ -134,27 +162,36 @@ public sealed class PendingViewModel : ObservableObject
     private void LoadItems()
     {
         var selected = Items.Where(item => item.Selected).Select(item => (item.Article.Biz, item.Article.Id)).ToHashSet();
+        foreach (var item in Items) item.PropertyChanged -= OnRowChanged;
         Items.Clear();
         var accounts = _selectedAccount is null ? Accounts : [_selectedAccount];
         foreach (var account in accounts)
         foreach (var article in account.Account.Articles)
         {
             var item = new PendingArticleRow(article) { Selected = selected.Contains((article.Biz, article.Id)) };
-            item.PropertyChanged += (_, e) =>
-            {
-                if (e.PropertyName != nameof(PendingArticleRow.Selected)) return;
-                SelectedCount = Items.Count(row => row.Selected);
-                _allSelected = Items.Count > 0 && Items.All(row => row.Selected);
-                OnPropertyChanged(nameof(AllSelected));
-            };
+            item.PropertyChanged += OnRowChanged;
             Items.Add(item);
         }
-        SelectedCount = Items.Count(item => item.Selected);
-        _allSelected = Items.Count > 0 && Items.All(item => item.Selected);
-        OnPropertyChanged(nameof(AllSelected));
+        UpdateSelection();
         OnPropertyChanged(nameof(IsEmpty));
         OnPropertyChanged(nameof(EmptyText));
         OnPropertyChanged(nameof(Summary));
+    }
+
+    private void OnRowChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PendingArticleRow.Selected) && !_updatingSelection) UpdateSelection();
+    }
+
+    private void UpdateSelection()
+    {
+        SelectedCount = Items.Count(item => item.Selected);
+        OnPropertyChanged(nameof(SelectionText));
+        OnPropertyChanged(nameof(SelectionState));
+        OnPropertyChanged(nameof(AllSelected));
+        ToggleSelectionCommand.RaiseCanExecuteChanged();
+        SaveCommand.RaiseCanExecuteChanged();
+        DeleteCommand.RaiseCanExecuteChanged();
     }
 
     private void SaveSelected()

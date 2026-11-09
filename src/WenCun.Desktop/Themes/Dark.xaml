@@ -9,7 +9,9 @@
     <SolidColorBrush x:Key="TextBrush" Color="#EAE5DA"/>
     <SolidColorBrush x:Key="HeadingBrush" Color="#F2EEE5"/>
     <SolidColorBrush x:Key="MutedBrush" Color="#A3A79C"/>
-    <SolidColorBrush x:Key="FaintBrush" Color="#7D8279"/>
+    <SolidColorBrush x:Key="FaintBrush" Color="#959B90"/>
+    <!-- 交互轮廓独立于面板边框，兼顾纸面、悬停和选中底色。 -->
+    <SolidColorBrush x:Key="ControlBorderBrush" Color="#7D887B"/>
     <SolidColorBrush x:Key="BorderBrush" Color="#333A34"/>
     <SolidColorBrush x:Key="RuleBrush" Color="#2A302A"/>
     <SolidColorBrush x:Key="AccentBrush" Color="#8FB7A2"/>

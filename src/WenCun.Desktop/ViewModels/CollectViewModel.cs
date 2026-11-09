@@ -28,7 +28,7 @@ public sealed class CollectViewModel : ObservableObject
     private bool _consent;
     private bool _busy;
     private string _state = "从公众号获取文章目录";
-    private string _detail = "在微信中打开目标公众号的一篇文章。";
+    private string _detail = "先同意证书和代理设置，点击“获取目录”，再在微信中打开目标公众号的一篇文章。";
     private bool _showCertificate;
     private int _pages;
     private int _found;
@@ -44,12 +44,12 @@ public sealed class CollectViewModel : ObservableObject
         _discovered = discovered;
         _refreshPending = refreshPending;
         _canStart = canStart ?? (() => true);
-        StartCommand = new AsyncRelayCommand(StartAsync, () => !IsBusy);
-        StopCommand = new RelayCommand(() => _cts?.Cancel());
+        StartCommand = new AsyncRelayCommand(StartAsync, () => Consent && CanEditSettings);
+        StopCommand = new RelayCommand(() => _ = StopAsync(), () => IsBusy && _cts is { IsCancellationRequested: false });
         ChangeLibraryCommand = new RelayCommand(() => ChangeLibraryRequested?.Invoke());
         RemoveCertificateCommand = new RelayCommand(() =>
         {
-            if (IsBusy) { Detail = "请先停止获取目录，再移除证书。"; return; }
+            if (!CanEditSettings) { Detail = "采集、保存或导出结束后，再移除证书。"; return; }
             try
             {
                 LocalCaptureCertificate.RemovePersistent();
@@ -67,16 +67,26 @@ public sealed class CollectViewModel : ObservableObject
 
     public event Action? ChangeLibraryRequested;
 
-    public bool Consent { get => _consent; set => Set(ref _consent, value); }
+    public bool Consent
+    {
+        get => _consent;
+        set { if (Set(ref _consent, value)) ((AsyncRelayCommand)StartCommand).RaiseCanExecuteChanged(); }
+    }
     public bool IsBusy
     {
         get => _busy;
         private set
         {
-            if (Set(ref _busy, value)) OnPropertyChanged(nameof(CanEditSettings));
+            if (Set(ref _busy, value)) NotifyWorkStateChanged();
         }
     }
-    public bool CanEditSettings => !IsBusy;
+    public bool CanEditSettings => !IsBusy && _canStart();
+    public void NotifyWorkStateChanged()
+    {
+        OnPropertyChanged(nameof(CanEditSettings));
+        ((AsyncRelayCommand)StartCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)StopCommand).RaiseCanExecuteChanged();
+    }
     public bool ShowCertificate { get => _showCertificate; private set => Set(ref _showCertificate, value); }
     public string State { get => _state; private set => Set(ref _state, value); }
     public string Detail { get => _detail; private set => Set(ref _detail, value); }
@@ -86,7 +96,13 @@ public sealed class CollectViewModel : ObservableObject
     public Session? LastSession => _session;
     public Task StopAsync()
     {
-        _cts?.Cancel();
+        if (_cts is { IsCancellationRequested: false })
+        {
+            State = "正在停止";
+            Detail = "正在等待目录任务结束并清理网络设置，已获取的目录会保留。";
+            _cts.Cancel();
+            ((RelayCommand)StopCommand).RaiseCanExecuteChanged();
+        }
         return _stopped?.Task ?? Task.CompletedTask;
     }
     public string LibraryPath => _library.RootDirectory;
@@ -115,12 +131,18 @@ public sealed class CollectViewModel : ObservableObject
         OnPropertyChanged(nameof(LibraryPath));
     }
 
-    public void SetTarget(Account account)
+    public bool SetTarget(Account account, string? detail = null)
     {
+        if (!CanEditSettings)
+        {
+            Detail = "采集、保存或导出进行中，请等待当前任务结束后再切换公众号。";
+            return false;
+        }
         _expectedBiz = account.Biz;
         _expectedAccount = string.IsNullOrWhiteSpace(account.Name) ? account.Biz : account.Name;
         State = "获取“" + _expectedAccount + "”的目录";
-        Detail = "点击“获取目录”，然后在微信中打开这个公众号的一篇文章。";
+        Detail = "点击“获取目录”，然后在微信中打开这个公众号的一篇文章。" + detail;
+        return true;
     }
 
     private bool HasFormat(string name) =>
@@ -128,6 +150,7 @@ public sealed class CollectViewModel : ObservableObject
 
     private void SetFormat(string name, bool enabled)
     {
+        if (!CanEditSettings) return;
         var formats = (App.Config.Formats ?? []).ToList();
         if (enabled)
         {
@@ -145,6 +168,7 @@ public sealed class CollectViewModel : ObservableObject
 
     private void SetImages(string mode)
     {
+        if (!CanEditSettings) return;
         App.Config.Images = mode;
         App.Config.Save(_appRoot);
         OnPropertyChanged(nameof(ImagesDownload));
@@ -166,8 +190,10 @@ public sealed class CollectViewModel : ObservableObject
         _pages = _found = _pendingCount = 0;
         NotifyCounts();
         _cts = new CancellationTokenSource();
+        ((RelayCommand)StopCommand).RaiseCanExecuteChanged();
         var ct = _cts.Token;
         CaptureProxy? proxy = null;
+        var cancelled = false;
         try
         {
             proxy = new CaptureProxy(_appRoot, _expectedBiz);
@@ -176,6 +202,7 @@ public sealed class CollectViewModel : ObservableObject
             State = "正在准备连接";
             Detail = "首次使用时，请在 Windows 提示中允许安装本地证书。";
             await Task.Run(proxy.Start);
+            ct.ThrowIfCancellationRequested();
             State = _expectedAccount.Length > 0
                 ? $"请在微信中打开“{_expectedAccount}”的一篇文章"
                 : "请在微信中打开目标公众号的一篇文章";
@@ -189,12 +216,14 @@ public sealed class CollectViewModel : ObservableObject
             Detail = "已连接微信，正在恢复网络设置。";
             var warnings = await proxy.StopAsync();
             if (warnings.Count > 0) throw new IOException(string.Join("；", warnings));
+            ct.ThrowIfCancellationRequested();
             State = "正在读取文章目录";
             Detail = "目录会逐页显示在下方，此时不会保存文章正文。";
             using var client = new WeChatClient();
             var collector = new Collector(_library, client, _pending, App.Config.ToSaveOptions(), _pdfRenderer);
             var progress = new Progress<CollectProgress>(report =>
             {
+                if (ct.IsCancellationRequested || !IsBusy) return;
                 _pages = report.Pages;
                 _found = report.Found;
                 _pendingCount = report.Saved;
@@ -215,8 +244,9 @@ public sealed class CollectViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            State = "已停止";
-            Detail = "已获取的文章目录已保留。";
+            cancelled = true;
+            State = "正在停止";
+            Detail = "正在清理网络设置，已获取的目录会保留。";
         }
         catch (Exception ex)
         {
@@ -225,15 +255,26 @@ public sealed class CollectViewModel : ObservableObject
         }
         finally
         {
+            string? cleanupWarning = null;
             if (proxy is not null)
             {
                 try
                 {
                     var warnings = await proxy.StopAsync();
-                    if (warnings.Count > 0) Detail = string.Join("；", warnings);
+                    if (warnings.Count > 0) cleanupWarning = string.Join("；", warnings);
                     await proxy.DisposeAsync();
                 }
-                catch (Exception ex) { Detail = "清理采集代理失败：" + ex.Message; }
+                catch (Exception ex) { cleanupWarning = "清理采集代理失败：" + ex.Message; }
+            }
+            if (cleanupWarning is not null)
+            {
+                State = "目录任务已结束，网络清理未完成";
+                Detail = cleanupWarning;
+            }
+            else if (cancelled)
+            {
+                State = "已停止";
+                Detail = "网络设置已恢复，已获取的文章目录已保留。";
             }
             _cts?.Dispose();
             _cts = null;

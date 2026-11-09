@@ -3,16 +3,16 @@
     <Viewbox x:Key="WenCunMark" x:Shared="False" Stretch="Uniform">
         <Canvas Width="64" Height="64">
             <Path Data="M8 22C8 20.3 9.3 19 11 19H53C54.7 19 56 20.3 56 22V26H8Z"
-                  Fill="{DynamicResource LogoStrokeBrush}" Opacity=".56"/>
+                  Fill="{DynamicResource LogoGroundBrush}" Opacity=".56"/>
             <Path Data="M22 12L41 10.4C43 10.2 44.8 11.5 45 13.5L46.8 29H21.2L20 15C19.8 13.4 20.7 12.1 22 12Z"
-                  Fill="{DynamicResource LogoGroundBrush}"/>
-            <Path Data="M26 18.1L38.7 16.9M26.5 22.6L35.5 21.8" Stroke="{DynamicResource LogoStrokeBrush}"
+                  Fill="{DynamicResource LogoStrokeBrush}"/>
+            <Path Data="M26 18.1L38.7 16.9M26.5 22.6L35.5 21.8" Stroke="{DynamicResource LogoGroundBrush}"
                   StrokeThickness="2.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
             <Path Data="M40.5 13.2L45.3 14.5C46.5 14.8 47.3 15.9 47.1 17.1L46.2 23.5C46 24.7 44.9 25.5 43.7 25.3L38.9 24C37.7 23.7 36.9 22.6 37.1 21.4L38 15C38.2 13.8 39.3 13 40.5 13.2Z"
                   Fill="{DynamicResource LogoDotBrush}"/>
             <Path Data="M8 27H56V46C56 51 52 55 47 55H17C12 55 8 51 8 46Z"
-                  Fill="{DynamicResource LogoStrokeBrush}"/>
-            <Path Data="M11 29H53" Stroke="{DynamicResource LogoGroundBrush}" Opacity=".28"
+                  Fill="{DynamicResource LogoGroundBrush}"/>
+            <Path Data="M11 29H53" Stroke="{DynamicResource LogoStrokeBrush}" Opacity=".28"
                   StrokeThickness="2" StrokeStartLineCap="Round"/>
         </Canvas>
     </Viewbox>

@@ -25,7 +25,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $tests = Join-Path $root 'tests\WenCun.Tests\WenCun.Tests.csproj'
 if ($SkipNativeUi) {
-    & $dotnet test $tests --no-build --filter 'FullyQualifiedName!~NativeUiTests'
+    & $dotnet test $tests --no-build --filter 'FullyQualifiedName!~NativeUiTests&FullyQualifiedName!~ReaderUxTests'
 } else {
     & $dotnet test $tests --no-build
 }

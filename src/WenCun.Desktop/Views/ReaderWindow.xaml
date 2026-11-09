@@ -4,10 +4,43 @@
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="阅读 — 文存" Width="980" Height="820" MinWidth="720" MinHeight="520"
         WindowStartupLocation="CenterOwner" Background="{DynamicResource CanvasBrush}"
+        Foreground="{DynamicResource TextBrush}" AutomationProperties.Name="文章阅读窗口"
         Icon="pack://application:,,,/WenCun;component/Assets/wencun.ico" FontFamily="{DynamicResource UiFont}"
         TextOptions.TextFormattingMode="Ideal" TextOptions.TextRenderingMode="ClearType"
         UseLayoutRounding="True">
     <Grid>
-        <wv2:WebView2 x:Name="Browser"/>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Border x:Name="NavigationNotice" Visibility="Collapsed" Padding="20,10"
+                Background="{DynamicResource SubtleBrush}" BorderBrush="{DynamicResource RuleBrush}" BorderThickness="0,0,0,1">
+            <TextBlock x:Name="NavigationMessage" TextWrapping="Wrap"
+                       FontSize="13" Foreground="{DynamicResource TextBrush}" AutomationProperties.LiveSetting="Polite"/>
+        </Border>
+        <Grid x:Name="BrowserHost" Grid.Row="1">
+            <wv2:WebView2 x:Name="Browser" Visibility="Hidden" AutomationProperties.Name="文章正文"/>
+        </Grid>
+        <Border x:Name="StatusPanel" Grid.Row="1" Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource RuleBrush}" BorderThickness="1" CornerRadius="10"
+                MaxWidth="520" Margin="32" Padding="32" VerticalAlignment="Center">
+            <StackPanel>
+                <TextBlock x:Name="StatusTitle" Text="正在打开文章…" FontSize="22"
+                           FontFamily="{DynamicResource DisplayFont}" Foreground="{DynamicResource HeadingBrush}"
+                           TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+                <TextBlock x:Name="StatusDetail" Text="正在准备本地正文和图片。" Margin="0,12,0,0"
+                           FontSize="13" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"/>
+                <ProgressBar x:Name="LoadingProgress" IsIndeterminate="True" Height="3" Margin="0,20,0,0"
+                             BorderThickness="0" Background="{DynamicResource SubtleBrush}"
+                             Foreground="{DynamicResource AccentBrush}" AutomationProperties.Name="正在加载文章"/>
+                <StackPanel Orientation="Horizontal" Margin="0,24,0,0">
+                    <Button x:Name="RetryButton" Content="重试" Visibility="Collapsed" Margin="0,0,10,0"
+                            Style="{DynamicResource PrimaryButton}" MinWidth="72" Click="Retry_Click"
+                            AutomationProperties.Name="重新打开文章"/>
+                    <Button x:Name="CloseButton" Content="关闭" Style="{DynamicResource GhostButton}" MinWidth="72"
+                            Click="Close_Click" AutomationProperties.Name="关闭阅读窗口"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>

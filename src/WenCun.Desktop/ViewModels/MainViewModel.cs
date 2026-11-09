@@ -17,14 +17,16 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
 {
     private Library _library;
     private readonly string _appRoot;
+    private readonly Func<WeChatClient> _createClient;
     private readonly SemaphoreSlim _workGate = new(1, 1);
     private string _section = "Library";
     private string _status = "就绪";
 
-    public MainViewModel(Library library, string appRoot, string? recoveryWarning)
+    public MainViewModel(Library library, string appRoot, string? recoveryWarning, Func<WeChatClient>? createClient = null)
     {
         _library = library;
         _appRoot = appRoot;
+        _createClient = createClient ?? (() => new WeChatClient());
         Pending = new PendingStore(appRoot);
         PdfRenderer = new WebViewPdfRenderer(appRoot);
         LibraryPage = new LibraryViewModel(library, Pending, this, SetStatus);
@@ -33,7 +35,10 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
         CollectPage = new CollectViewModel(library, appRoot, PdfRenderer, Pending, OnDiscovered, () => PendingPage.Load(), () => _workGate.CurrentCount > 0);
         AccountsPage = new AccountsViewModel(library, Pending, ViewAccount, CollectAccount, RetryFailedAsync,
             ReexportFailedAsync, DeleteAccountAsync, ViewPending);
-        _section = _library.Accounts().Count == 0 && !Pending.LoadAll().Any() ? "Collect" : "Library";
+        var hasArticles = _library.Query(new LibraryQuery(PageSize: 1)).Total > 0;
+        var hasPending = Pending.LoadAll().Any(account => account.Articles.Count > 0);
+        _section = hasArticles || hasPending ? "Library" : "Collect";
+        if (!hasArticles && hasPending) LibraryPage.ShowPending = true;
         CollectPage.ChangeLibraryRequested += () => ChangeLibraryRequested?.Invoke();
         CollectPage.PropertyChanged += (_, e) =>
         {
@@ -59,6 +64,7 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
 
     public event Action<Article, ArticleContent>? ReadRequested;
     public event Action? ChangeLibraryRequested;
+    public event Func<int, bool>? ConfirmPendingDeleteRequested;
 
     public string Section
     {
@@ -178,28 +184,22 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
 
     public async Task RetryAsync(IReadOnlyList<Article> articles)
     {
-        if (articles.Count == 0) return;
+        if (articles.Count == 0 || RejectBusy()) return;
         var session = CollectPage.LastSession;
-        if (session is null)
+        if (session is null || articles.All(article => article.Biz != session.Biz))
         {
-            Section = "Collect";
-            if (LibraryPage.SelectedAccount is { } selected) CollectPage.SetTarget(selected.Account);
-            SetStatus("请先在采集页获取一次目录，再重试。");
+            PrepareCollection(articles.Select(article => new PendingArticle(article.Id, article.Biz, article.Account,
+                article.Title, article.Author, article.Url, article.PublishedAt, DateTimeOffset.UtcNow)).ToArray(), retry: true);
             return;
         }
         var eligible = articles.Where(article => article.Biz == session.Biz).ToArray();
-        if (eligible.Length == 0)
-        {
-            SetStatus("这些文章属于另一个公众号，请先获取该公众号的目录。");
-            return;
-        }
         if (!TryBeginWork()) return;
+        var done = 0;
         try
         {
             SetStatus($"正在重试 {eligible.Length} 篇…");
-            using var client = new WeChatClient();
+            using var client = _createClient();
             var collector = new Collector(_library, client, Pending, App.Config.ToSaveOptions(), PdfRenderer);
-            var done = 0;
             foreach (var article in eligible)
             {
                 try
@@ -221,7 +221,9 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
         }
         finally { EndWork(); }
         LibraryPage.Load();
+        PendingPage.Load();
         AccountsPage.Load();
+        if (done > 0) ShowSavedArticles(session.Biz);
     }
 
     public async Task ReexportAsync(IReadOnlyList<Article> articles)
@@ -293,27 +295,20 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
 
     public async Task SavePendingAsync(IReadOnlyList<PendingArticle> selected)
     {
-        if (selected.Count == 0) return;
+        if (selected.Count == 0 || RejectBusy()) return;
         var session = CollectPage.LastSession;
-        if (session is null)
+        if (session is null || selected.All(article => article.Biz != session.Biz))
         {
-            Section = "Collect";
-            SetStatus("请先获取这个公众号的目录，再保存文章。");
+            PrepareCollection(selected, retry: false);
             return;
         }
         var eligible = selected.Where(article => string.Equals(article.Biz, session.Biz, StringComparison.Ordinal)).ToArray();
-        if (eligible.Length == 0)
-        {
-            Section = "Collect";
-            SetStatus("这些文章属于另一个公众号，请先获取该公众号的目录。");
-            return;
-        }
         if (!TryBeginWork()) return;
         var saved = 0;
         try
         {
             SetStatus($"正在保存 {eligible.Length} 篇…");
-            using var client = new WeChatClient();
+            using var client = _createClient();
             var collector = new Collector(_library, client, Pending, App.Config.ToSaveOptions(), PdfRenderer);
             var progress = new Progress<CollectProgress>(report =>
                 SetStatus($"正在保存 {Math.Min(report.Saved + 1, report.Found)}/{report.Found} 篇：{report.Detail}"));
@@ -332,19 +327,59 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
         PendingPage.Load();
         LibraryPage.Load();
         AccountsPage.Load();
-        if (saved > 0) Section = "Library";
+        if (saved > 0) ShowSavedArticles(session.Biz);
+    }
+
+    private void PrepareCollection(IReadOnlyList<PendingArticle> selected, bool retry)
+    {
+        var first = selected[0];
+        var scope = selected.Where(article => article.Biz == first.Biz).ToArray();
+        var name = scope.Select(article => article.Account).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name))
+            ?? _library.GetAccountName(first.Biz) ?? first.Biz;
+        var remaining = selected.Count - scope.Length;
+        var next = retry ? "获取目录后，返回资料库重试所选文章。" : "获取目录后，保存下方已勾选的文章。";
+        var message = $"先获取“{name}”的目录，本次{(retry ? "重试" : "保存")}该公众号的 {scope.Length} 篇。" + next;
+        if (remaining > 0) message += $"其余 {remaining} 篇请切换公众号，分别获取目录后再选择{(retry ? "重试" : "保存")}。";
+        if (!CollectPage.SetTarget(new Account(first.Biz, name, 0, 0, 0, 0, 0, null, null, false), message)) return;
+        PendingPage.Load();
+        PendingPage.SelectAccount(first.Biz);
+        var ids = scope.Select(article => article.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var row in PendingPage.Items)
+            row.Selected = row.Article.Biz == first.Biz && ids.Contains(row.Article.Id);
+        Section = "Collect";
+        SetStatus(message);
+    }
+
+    private void ShowSavedArticles(string biz)
+    {
+        LibraryPage.ClearFiltersCommand.Execute(null);
+        LibraryPage.SelectAccount(biz);
+        Section = "Library";
     }
 
     public void DeletePending(IReadOnlyList<PendingArticle> selected)
     {
-        if (RejectBusy()) return;
+        if (RejectBusy() || selected.Count == 0) return;
         try
         {
-            foreach (var group in selected.GroupBy(article => article.Biz))
+            var existing = selected.GroupBy(article => article.Biz).SelectMany(group =>
+            {
+                var ids = group.Select(article => article.Id).ToHashSet(StringComparer.Ordinal);
+                return (Pending.Load(group.Key)?.Articles ?? []).Where(article => ids.Contains(article.Id));
+            }).ToArray();
+            if (existing.Length == 0) { SetStatus("所选条目已不在待保存清单中。"); return; }
+            if (ConfirmPendingDeleteRequested?.Invoke(existing.Length) != true)
+            {
+                SetStatus("已取消移除，待保存清单保持不变。");
+                return;
+            }
+            if (RejectBusy()) return;
+            foreach (var group in existing.GroupBy(article => article.Biz))
                 Pending.RemoveArticles(group.Key, group.Select(article => article.Id));
             LibraryPage.Load();
             PendingPage.Load();
             AccountsPage.Load();
+            SetStatus($"已移除 {existing.Length} 篇待保存文章，文库正文和已导出文件保持不变。");
         }
         catch (Exception ex) when (IsExpected(ex))
         {
@@ -400,8 +435,11 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
 
     private void CollectAccount(Account account)
     {
+        if (RejectBusy()) return;
+        if (!CollectPage.SetTarget(account)) return;
+        PendingPage.Load();
+        PendingPage.SelectAccount(account.Biz);
         Section = "Collect";
-        CollectPage.SetTarget(account);
     }
 
     private void ViewPending(Account account)
@@ -418,7 +456,6 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
             SetStatus("这个公众号没有采集失败的文章。");
             return;
         }
-        if (CollectPage.LastSession is null) CollectPage.SetTarget(account);
         await RetryAsync(articles);
     }
 
@@ -452,8 +489,9 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
     private bool TryBeginWork()
     {
         if (RejectBusy()) return false;
-        _workGate.Wait(0);
+        if (!_workGate.Wait(0)) return false;
         OnPropertyChanged(nameof(IsBusy));
+        CollectPage.NotifyWorkStateChanged();
         return true;
     }
 
@@ -461,5 +499,6 @@ public sealed class MainViewModel : ObservableObject, ILibraryActions
     {
         _workGate.Release();
         OnPropertyChanged(nameof(IsBusy));
+        CollectPage.NotifyWorkStateChanged();
     }
 }

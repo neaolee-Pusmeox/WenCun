@@ -28,6 +28,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify.ps1
 
 - 本地没有 CI 工作流；本地脚本和人工验收是唯一门禁，不能用“模型说已通过”代替。
 - 涉及界面、绑定、主题、字体、图标时，另跑原生 UI smoke，并按 `docs/UI-DESIGN.md` 检查浅色/深色与 1000 宽窗口。
+- 采集布局还需检查宽、窄、矮、高窗口的独立滚动、固定保存按钮和筛选刷新；窗口尺寸改动需检查最大化 / 恢复后的原生客户区绘制边界，不能只验普通窗口截图。
+- 原生 UI smoke 包括主窗口与阅读窗口；无桌面环境的 `-SkipNativeUi` 会排除两者，不能作为界面发布验收。阅读器改动还需实际本地 WebView2 渲染，模拟初始化成功不足以证明正文可读。
+- 修改图标或生成脚本时额外运行 `python -B scripts/test_render_icon.py`，并检查 Windows 读取的实际 ICO / 可执行文件图标方向、透明圆角与 16–256 各帧；不可只审查 PNG。
 - 涉及采集、代理、证书时，按 `docs/DEVELOPMENT.md` 的人工验收项补真实环境验证；模拟响应不能替代现场结论。
 - 缺陷修复先在未修实现上复现失败，再确认修复后通过；只改测试或只改实现都不算完成。
 
@@ -40,14 +43,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify.ps1
 
 ```powershell
 git add -A
-git commit -m "release: 0.1.1"
+git commit -m "release: 0.1.2"
 ```
 
 5. 从刚提交的源码生成发布包并检查实际产物：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish.ps1 -Output publish\release-0.1.1
-(Get-Item publish\release-0.1.1\WenCun.exe).VersionInfo.ProductVersion
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish.ps1 -Output publish\release-0.1.2
+(Get-Item publish\release-0.1.2\WenCun.exe).VersionInfo.ProductVersion
 ```
 
 `publish\` 是本地产物，不入库；版本检查必须读取生成的 exe，而不是只信 csproj。
@@ -61,8 +64,8 @@ git push origin main
 7. 发布标签与远程发布（仅在明确授权时执行）：
 
 ```powershell
-git tag -a v0.1.1 -m "文存 0.1.1"
-git push origin v0.1.1
+git tag -a v0.1.2 -m "文存 0.1.2"
+git push origin v0.1.2
 ```
 
 GitHub Release 的标题、更新说明和资产必须来自同一版本的 `CHANGELOG.md` 与已核验的发布包；不得用预览包冒充稳定包。

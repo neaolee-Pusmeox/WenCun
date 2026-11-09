@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
@@ -23,7 +24,8 @@ public sealed class LibraryViewModel : ObservableObject
     private int _page = 1;
     private int _totalPages = 1;
     private int _total;
-    private bool _allSelected;
+    private int _selectedCount;
+    private bool _updatingSelection;
     private bool _loading;
     private bool _isPendingView;
 
@@ -35,8 +37,11 @@ public sealed class LibraryViewModel : ObservableObject
         _status = status;
         RefreshCommand = new RelayCommand(Load);
         SearchCommand = new RelayCommand(() => { _page = 1; LoadArticles(); });
-        PrevCommand = new RelayCommand(() => { if (_page > 1) { _page--; LoadArticles(); } });
-        NextCommand = new RelayCommand(() => { if (_page < _totalPages) { _page++; LoadArticles(); } });
+        ClearFiltersCommand = new RelayCommand(ClearFilters, () => CanClearFilters);
+        PrevCommand = new RelayCommand(() => { if (_page > 1) { _page--; LoadArticles(); } }, () => _page > 1);
+        NextCommand = new RelayCommand(() => { if (_page < _totalPages) { _page++; LoadArticles(); } }, () => _page < _totalPages);
+        // 表头单向绑定 SelectionState，用命令让半选点击变为全选。
+        ToggleSelectionCommand = new RelayCommand(() => AllSelected = !AllSelected, () => Items.Count > 0);
         ToggleSortCommand = new RelayCommand(() =>
         {
             _descending = !_descending;
@@ -54,10 +59,11 @@ public sealed class LibraryViewModel : ObservableObject
         });
         SaveSelectedPendingCommand = new RelayCommand(() =>
         {
+            if (RejectBusy()) return;
             var pending = Items.Where(row => row.Selected && row.Pending is not null).Select(row => row.Pending!).ToArray();
             if (pending.Length == 0) { _status("请先勾选要保存的文章。"); return; }
             _ = _actions.SavePendingAsync(pending);
-        });
+        }, () => !_actions.IsBusy && _isPendingView && SelectedCount > 0);
         CleanupLegacyCommand = new RelayCommand(_actions.CleanupLegacyPending);
         RetryFailedCommand = new RelayCommand(() =>
         {
@@ -66,8 +72,14 @@ public sealed class LibraryViewModel : ObservableObject
             if (failed.Count == 0) { _status("当前范围没有采集失败的文章。"); return; }
             _ = _actions.RetryAsync(failed);
         });
-        ReexportSelectedCommand = new RelayCommand(ReexportSelected);
-        DeleteCommand = new RelayCommand(DeleteSelected);
+        ReexportSelectedCommand = new RelayCommand(ReexportSelected, () => !_actions.IsBusy && !_isPendingView && SelectedCount > 0);
+        DeleteCommand = new RelayCommand(DeleteSelected, () => !_actions.IsBusy && SelectedCount > 0);
+        if (_actions is INotifyPropertyChanged observable)
+            observable.PropertyChanged += (_, e) =>
+            {
+                if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(ILibraryActions.IsBusy))
+                    NotifySelectionCommands();
+            };
     }
 
     public ObservableCollection<AccountRow> Accounts { get; } = [];
@@ -76,7 +88,16 @@ public sealed class LibraryViewModel : ObservableObject
     public string Search
     {
         get => _search;
-        set => Set(ref _search, value);
+        set
+        {
+            if (!Set(ref _search, value ?? "")) return;
+            NotifyFilters();
+            if (string.IsNullOrWhiteSpace(_search) && !_loading)
+            {
+                _page = 1;
+                LoadArticles();
+            }
+        }
     }
 
     public AccountRow? SelectedAccount
@@ -124,39 +145,55 @@ public sealed class LibraryViewModel : ObservableObject
         ? $"{_total} 篇待保存" + (_selectedAccount is null ? "" : $"，{_selectedAccount.Name}")
         : $"{_total} 篇文章" + (_selectedAccount is null ? "" : $"，{_selectedAccount.Name}");
     public bool IsEmpty => Items.Count == 0;
-    public string EmptyText => _search.Length > 0
+    public bool CanClearFilters => !string.IsNullOrWhiteSpace(_search) || _selectedAccount is not null || _state is not null || _isPendingView;
+    public string EmptyText => !string.IsNullOrWhiteSpace(_search)
         ? "没有匹配的文章。"
         : _isPendingView
             ? "没有待保存的文章。"
-            : _selectedAccount is not null
-                ? "这个公众号还没有文章。"
-                : "保存的文章会出现在这里。";
+            : _state == ContentState.Failed
+                ? "当前范围没有采集失败的文章。"
+                : _state == ContentState.Ready
+                    ? "当前范围没有已保存的文章。"
+                    : _selectedAccount is not null
+                        ? "这个公众号还没有文章。"
+                        : "保存的文章会出现在这里。";
+
+    public int SelectedCount => _selectedCount;
+    public string SelectionText => $"当前页已选 {SelectedCount} 篇";
+    public bool? SelectionState
+    {
+        get => SelectedCount == 0 ? false : SelectedCount == Items.Count ? true : null;
+        set => AllSelected = value != false;
+    }
 
     public bool AllSelected
     {
-        get => _allSelected;
+        get => Items.Count > 0 && SelectedCount == Items.Count;
         set
         {
-            if (!Set(ref _allSelected, value)) return;
-            foreach (var item in Items) item.Selected = value;
+            _updatingSelection = true;
+            try { foreach (var item in Items) item.Selected = value; }
+            finally { _updatingSelection = false; UpdateSelection(); }
         }
     }
 
     public ICommand RefreshCommand { get; }
     public ICommand SearchCommand { get; }
-    public ICommand PrevCommand { get; }
-    public ICommand NextCommand { get; }
+    public RelayCommand ClearFiltersCommand { get; }
+    public RelayCommand PrevCommand { get; }
+    public RelayCommand NextCommand { get; }
+    public RelayCommand ToggleSelectionCommand { get; }
     public ICommand ToggleSortCommand { get; }
     public ICommand SelectAllCommand { get; }
     public ICommand ReadCommand { get; }
     public ICommand RetryCommand { get; }
     public ICommand OpenFolderCommand { get; }
     public ICommand SavePendingCommand { get; }
-    public ICommand SaveSelectedPendingCommand { get; }
+    public RelayCommand SaveSelectedPendingCommand { get; }
     public ICommand CleanupLegacyCommand { get; }
     public ICommand RetryFailedCommand { get; }
-    public ICommand ReexportSelectedCommand { get; }
-    public ICommand DeleteCommand { get; }
+    public RelayCommand ReexportSelectedCommand { get; }
+    public RelayCommand DeleteCommand { get; }
 
     public void Load()
     {
@@ -216,66 +253,109 @@ public sealed class LibraryViewModel : ObservableObject
             return;
         }
         var result = _library.Query(new LibraryQuery(_search, _selectedAccount?.Account.Biz, _state, _page, PageSize, _descending));
-        if (result.Items.Count == 0 && result.Total > 0 && _page > 1)
+        if (result.Items.Count == 0 && _page > 1)
         {
             _page = Math.Max(1, (int)Math.Ceiling(result.Total / (double)PageSize));
-            result = _library.Query(new LibraryQuery(_search, _selectedAccount?.Account.Biz, _state, _page, PageSize, _descending));
+            if (result.Total > 0)
+                result = _library.Query(new LibraryQuery(_search, _selectedAccount?.Account.Biz, _state, _page, PageSize, _descending));
         }
-        Items.Clear();
-        foreach (var article in result.Items) Items.Add(new ArticleRow(article));
-        _total = result.Total;
-        _totalPages = Math.Max(1, (int)Math.Ceiling(result.Total / (double)PageSize));
-        _allSelected = false;
-        OnPropertyChanged(nameof(Summary));
-        OnPropertyChanged(nameof(PageText));
-        OnPropertyChanged(nameof(IsEmpty));
-        OnPropertyChanged(nameof(EmptyText));
-        OnPropertyChanged(nameof(AllSelected));
+        SetItems(result.Items.Select(article => new ArticleRow(article)), result.Total);
     }
 
     private void LoadPendingArticles()
     {
+        var search = _search.Trim();
         var rows = _pending.LoadAll()
             .Where(account => _selectedAccount is null || account.Biz == _selectedAccount.Account.Biz)
-            .SelectMany(account => account.Articles.Select(article => new { Account = account, Article = article }))
-            .Where(row => string.IsNullOrWhiteSpace(_search) ||
-                          row.Article.Title.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
-                          (row.Account.Account ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(account =>
+            {
+                var name = string.IsNullOrWhiteSpace(account.Account) ? _library.GetAccountName(account.Biz) : account.Account;
+                if (string.IsNullOrWhiteSpace(name)) name = account.Biz;
+                return account.Articles.Select(article => article with
+                {
+                    Account = string.IsNullOrWhiteSpace(article.Account) ? name : article.Account
+                });
+            })
+            .Where(article => search.Length == 0 ||
+                              article.Title.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                              article.Author.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                              article.Account.Contains(search, StringComparison.OrdinalIgnoreCase))
             .ToArray();
         var ordered = _descending
-            ? rows.OrderByDescending(row => row.Article.PublishedAt ?? DateTimeOffset.MinValue)
-            : rows.OrderBy(row => row.Article.PublishedAt ?? DateTimeOffset.MinValue);
+            ? rows.OrderByDescending(article => article.PublishedAt ?? DateTimeOffset.MinValue)
+            : rows.OrderBy(article => article.PublishedAt ?? DateTimeOffset.MinValue);
         var list = ordered.ToArray();
-        _total = list.Length;
-        _totalPages = Math.Max(1, (int)Math.Ceiling(list.Length / (double)PageSize));
-        if (_page > _totalPages) _page = _totalPages;
-        Items.Clear();
-        foreach (var row in list.Skip((_page - 1) * PageSize).Take(PageSize))
-        {
-            var accountName = string.IsNullOrWhiteSpace(row.Article.Account)
-                ? (string.IsNullOrWhiteSpace(row.Account.Account) ? _library.GetAccountName(row.Account.Biz) ?? "" : row.Account.Account)
-                : row.Article.Account;
-            if (string.IsNullOrWhiteSpace(accountName)) accountName = row.Account.Biz;
-            var article = new Article
+        _page = Math.Min(_page, Math.Max(1, (int)Math.Ceiling(list.Length / (double)PageSize)));
+        SetItems(list.Skip((_page - 1) * PageSize).Take(PageSize).Select(pending =>
+            new ArticleRow(new Article
             {
-                Id = row.Article.Id,
-                Url = row.Article.Url,
-                Biz = row.Article.Biz,
-                Account = accountName,
-                Title = row.Article.Title,
-                Author = row.Article.Author,
-                PublishedAt = row.Article.PublishedAt,
+                Id = pending.Id,
+                Url = pending.Url,
+                Biz = pending.Biz,
+                Account = pending.Account,
+                Title = pending.Title,
+                Author = pending.Author,
+                PublishedAt = pending.PublishedAt,
                 State = ContentState.NotFetched,
-                LastError = row.Article.LastError
-            };
-            Items.Add(new ArticleRow(article, row.Article with { Account = accountName }));
+                LastError = pending.LastError
+            }, pending)), list.Length);
+    }
+
+    private void SetItems(IEnumerable<ArticleRow> rows, int total)
+    {
+        foreach (var item in Items) item.PropertyChanged -= OnRowChanged;
+        Items.Clear();
+        foreach (var item in rows)
+        {
+            item.PropertyChanged += OnRowChanged;
+            Items.Add(item);
         }
-        _allSelected = false;
+        _total = total;
+        _totalPages = Math.Max(1, (int)Math.Ceiling(total / (double)PageSize));
         OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(PageText));
         OnPropertyChanged(nameof(IsEmpty));
-        OnPropertyChanged(nameof(EmptyText));
+        NotifyFilters();
+        UpdateSelection();
+        PrevCommand.RaiseCanExecuteChanged();
+        NextCommand.RaiseCanExecuteChanged();
+    }
+
+    private void OnRowChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ArticleRow.Selected) && !_updatingSelection) UpdateSelection();
+    }
+
+    private void UpdateSelection()
+    {
+        _selectedCount = Items.Count(item => item.Selected);
+        OnPropertyChanged(nameof(SelectedCount));
+        OnPropertyChanged(nameof(SelectionText));
+        OnPropertyChanged(nameof(SelectionState));
         OnPropertyChanged(nameof(AllSelected));
+        ToggleSelectionCommand.RaiseCanExecuteChanged();
+        NotifySelectionCommands();
+    }
+
+    private void NotifySelectionCommands()
+    {
+        DeleteCommand.RaiseCanExecuteChanged();
+        ReexportSelectedCommand.RaiseCanExecuteChanged();
+        SaveSelectedPendingCommand.RaiseCanExecuteChanged();
+    }
+
+    private void NotifyFilters()
+    {
+        OnPropertyChanged(nameof(CanClearFilters));
+        OnPropertyChanged(nameof(EmptyText));
+        ClearFiltersCommand.RaiseCanExecuteChanged();
+    }
+
+    private void ClearFilters()
+    {
+        Set(ref _search, "", nameof(Search));
+        _selectedAccount = null;
+        SetState(null);
     }
 
     private void SetState(ContentState? state)
@@ -288,12 +368,12 @@ public sealed class LibraryViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowPending));
         OnPropertyChanged(nameof(ShowFailed));
         OnPropertyChanged(nameof(IsPendingView));
-        LoadAccounts();
-        LoadArticles();
+        Load();
     }
 
     private void ReexportSelected()
     {
+        if (RejectBusy()) return;
         if (_isPendingView)
         {
             _status("文章还没有正文，保存后再导出。");
@@ -310,7 +390,7 @@ public sealed class LibraryViewModel : ObservableObject
 
     private void DeleteSelected()
     {
-        if (_actions.IsBusy) { _status("正在采集、保存或导出，请等待当前任务结束。"); return; }
+        if (RejectBusy()) return;
         var selected = Items.Where(item => item.Selected).ToArray();
         if (selected.Length == 0)
         {
@@ -338,5 +418,12 @@ public sealed class LibraryViewModel : ObservableObject
         {
             _status("删除文章失败：" + ex.Message);
         }
+    }
+
+    private bool RejectBusy()
+    {
+        if (!_actions.IsBusy) return false;
+        _status("正在采集、保存或导出，请等待当前任务结束。");
+        return true;
     }
 }
